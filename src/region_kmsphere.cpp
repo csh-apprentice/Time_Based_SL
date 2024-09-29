@@ -200,7 +200,7 @@ void RegKMSphere::shape_update()
   }
   if(update->ntimestep%100000==0)
   {
-    utils::logmesg(lmp,"REGION KMSPHERE, THE Press IN STEP {} IS {}, the RADIUS IS {}, the vradius is {}, number of atoms is {}\n",update->ntimestep,pressure/101325,radius,vradius,numatoms);
+    //utils::logmesg(lmp,"REGION KMSPHERE, THE Press IN STEP {} IS {}, the RADIUS IS {}, the vradius is {}, number of atoms is {}\n",update->ntimestep,pressure/101325,radius,vradius,numatoms);
     //utils::logmesg(lmp,"REGION KMSPHERE, Current radius is {}\n",radius);
   }
   pressure_old=pressure;
