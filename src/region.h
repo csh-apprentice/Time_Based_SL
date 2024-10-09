@@ -65,8 +65,18 @@ class Region : protected Pointers {
                         //  at previous time step
   // SL Mode
   double stress; //stress in the current region
+  double pressure_old;  //current pressure
   double pressure;  //pressure of the current region, only ussed in SL mode
   int numatoms; //number of atoms in the region
+  double SL_radius;  // radius used to communicate wall and the bubble
+  double SL_lastradius;  // radius in the last timestep
+  double SL_vradius; // velocity used to communicate wall and the bubble
+  //double Sl_gashellenergy; // total energy of the gas shell
+  double SL_Tblgas;  // gas shell temperature
+  double SL_Tblliquid;  //liquid shell temperature
+  double SL_Tblliquidold;  //liquid shell temperature
+  double SL_delta;  // thickness of the liquid shell
+  double SL_deltaold;  // last frame thickness of the liquid shell
 
   int vel_timestep;     // store timestep at which set_velocity was called
                         //   prevents multiple fix/wall/gran/region calls

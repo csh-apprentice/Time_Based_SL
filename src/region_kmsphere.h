@@ -53,9 +53,9 @@ class RegKMSphere : public Region {
   double Pinfty;  //the medium pressure
   double sigma; //surface tension
   double  miu;  //dynamics viscosity of liquid
+  
   //auto  compute_press;
-  double stresssum; // sum of the stress
-  double pressure_old;  //current pressure
+
   double cutoff; // cutoff in the fix/wall
   double volume; //volume of the outer shell
 
@@ -64,10 +64,21 @@ class RegKMSphere : public Region {
   double PA; // amplitude of the sound
 
   double tstart; // the starting time in fs
+  double scalefactor;  //scale the temperature
+  double Tinfty; // standard pressure
+  double alpha1;  // thermal diffusivity of liquid
+
+  int deltastyle,deltavar;
+  char *deltastr;
+  
   //double 
   void variable_check();
+  void delta_update();
   void SLRK4(double pressure, double pressure_old);
   double calf2(double update_t, double update_radius, double update_vradius, double pressure, double pressure_old);
+  // contains delta
+  void SLRK4(double pressure, double pressure_old, double Tbl, double Tbl_old);
+  double calf3(double update_t, double update_radius, double update_vradius, double delta, double Tbl, double Tbl_old);
 };
 
 }    // namespace LAMMPS_NS

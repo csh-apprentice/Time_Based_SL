@@ -33,6 +33,7 @@
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
+using MathConst::MY_PI;
 using MathConst::MY_2PI;
 using MathConst::MY_SQRT2;
 using MathConst::KB;
@@ -40,7 +41,7 @@ using MathConst::NA;
 using MathSpecial::powint;
 
 enum { LJ93, LJ126, LJ1043, COLLOID, HARMONIC, MORSE };
-enum { CONSTANT, VARIABLE };
+enum { CONSTANT, VARIABLE, AUTO };
 
 /* ---------------------------------------------------------------------- */
 
@@ -84,44 +85,73 @@ FixWallMDHeatbath::FixWallMDHeatbath(LAMMPS *lmp, int narg, char **arg) :
   if (style != COLLOID) dynamic_group_allow = 1;
 
   if (style == MORSE) {
-    if (narg != 12) error->all(FLERR, "Illegal fix wall/region command");
+    if (narg != 16) error->all(FLERR, "Illegal fix wall/region command");
 
     epsilon = utils::numeric(FLERR, arg[5], false, lmp);
     alpha = utils::numeric(FLERR, arg[6], false, lmp);
     sigma = utils::numeric(FLERR, arg[7], false, lmp);
     cutoff = utils::numeric(FLERR, arg[8], false, lmp);
-    if (utils::strmatch(arg[9], "^v_")) {
-    Tblstr = utils::strdup(arg[9] + 2);
-    Tbl=300.0;
+    mix_coeff=utils::numeric(FLERR, arg[9], false, lmp);
+    scalefactor=utils::numeric(FLERR, arg[10], false, lmp);
+    density=utils::numeric(FLERR, arg[11], false, lmp);
+    capacity=utils::numeric(FLERR, arg[12], false, lmp);
+    Tinfty=utils::numeric(FLERR, arg[13], false, lmp)*scalefactor;
+    // Tbl variable checking
+    if (utils::strmatch(arg[14], "^v_")) {
+    Tblstr = utils::strdup(arg[14] + 2);
     Tblstyle=VARIABLE;
     varshape=1;
     }
     else 
     {
-      Tbl=utils::numeric(FLERR, arg[9], false, lmp)*utils::numeric(FLERR, arg[11], false, lmp);
+      Tbl=utils::numeric(FLERR, arg[14], false, lmp)*scalefactor;
       Tblstyle=CONSTANT;
     }
+    // delta variable checking
+    if (utils::strmatch(arg[15], "^v_")) {
+    deltastr = utils::strdup(arg[15] + 2);
+    deltastyle=VARIABLE;
+    varshape=1;
+    }
+    else 
+    {
+      delta=utils::numeric(FLERR, arg[15], false, lmp);
+      deltastyle=CONSTANT;
+    }
+    
       
-    mix_coeff=utils::numeric(FLERR, arg[10], false, lmp);
-    scalefactor=utils::numeric(FLERR, arg[11], false, lmp);
+
   } else {
-    if (narg != 11) error->all(FLERR, "Illegal fix wall/region command");
+    if (narg != 15) error->all(FLERR, "Illegal fix wall/region command");
     epsilon = utils::numeric(FLERR, arg[5], false, lmp);
     sigma = utils::numeric(FLERR, arg[6], false, lmp);
     cutoff = utils::numeric(FLERR, arg[7], false, lmp);
-    if (utils::strmatch(arg[8], "^v_")) {
-    Tblstr = utils::strdup(arg[8] + 2);
-    Tbl=300.0;
+    mix_coeff=utils::numeric(FLERR, arg[8], false, lmp);
+    scalefactor=utils::numeric(FLERR, arg[9], false, lmp);
+    density=utils::numeric(FLERR, arg[10], false, lmp);
+    capacity=utils::numeric(FLERR, arg[11], false, lmp);
+    Tinfty=utils::numeric(FLERR, arg[12], false, lmp)*scalefactor;
+    if (utils::strmatch(arg[13], "^v_")) {
+    Tblstr = utils::strdup(arg[13] + 2);
     Tblstyle=VARIABLE;
     varshape=1;
     }
     else 
     {
-      Tbl=utils::numeric(FLERR, arg[8], false, lmp)*utils::numeric(FLERR, arg[10], false, lmp);
+      Tbl=utils::numeric(FLERR, arg[13], false, lmp)*scalefactor;
       Tblstyle=CONSTANT;
     }
-    mix_coeff=utils::numeric(FLERR, arg[9], false, lmp);
-    scalefactor=utils::numeric(FLERR, arg[10], false, lmp);
+
+    if (utils::strmatch(arg[14], "^v_")) {
+    deltastr = utils::strdup(arg[14] + 2);
+    deltastyle=VARIABLE;
+    varshape=1;
+    }
+    else 
+    {
+      delta=utils::numeric(FLERR, arg[14], false, lmp);
+      deltastyle=CONSTANT;
+    }
   }
 
   if (cutoff <= 0.0) error->all(FLERR, "Fix wall/region cutoff <= 0.0");
@@ -135,6 +165,8 @@ FixWallMDHeatbath::FixWallMDHeatbath(LAMMPS *lmp, int narg, char **arg) :
   {
     variable_check();
     temp_update();
+    if (deltastyle == VARIABLE)
+    delta_update(region);
   }
 }
 
@@ -236,6 +268,8 @@ void FixWallMDHeatbath::init()
     ilevel_respa = (dynamic_cast<Respa *>(update->integrate))->nlevels - 1;
     if (respa_level >= 0) ilevel_respa = MIN(respa_level, ilevel_respa);
   }
+  liquidenergy=cal_liquid_energy(region->SL_radius,delta);
+  //olddelta=delta;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -283,7 +317,7 @@ void FixWallMDHeatbath::post_force(int vflag)
 
   double old_kienergy;
   double new_kienergy;
-  double sum_kienergy;
+  double sum_kienergy=0.0;
   int numatoms=0;
 
   double *mass = atom->mass;
@@ -294,6 +328,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   double fix_stress_sum=0.0;
   double pair_stress_sum=0.0;
   double ke_stress_sum=0.0;
+  double energy_loss=0.0;
 
   pair_virial[0]=pair_virial[1]=pair_virial[2]=pair_virial[3]=pair_virial[4]=pair_virial[5]=0.0;
   ke_virial[0]=ke_virial[1]=ke_virial[2]=ke_virial[3]=ke_virial[4]=ke_virial[5]=0.0;
@@ -306,7 +341,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   if (varshape) 
   {
     temp_update();
-
+    delta_update(region);
   }
   int onflag = 0;
 
@@ -385,10 +420,12 @@ void FixWallMDHeatbath::post_force(int vflag)
         //utils::logmesg(lmp,"OLD FIX WALL HB DEBUG: avx {} avy {} avz {} old energy {} new energy {}\n",av[i][0],av[i][1],av[i][2],old_kienergy,new_kienergy);
         //utils::logmesg(lmp,"FIX WALL HB DEBUG: ry {} rz {} dely {} delz {} rvy {} rvz {}\n",ry,rz,dely,delz,rvy,rvz);
         //utils::logmesg(lmp,"FIX WALL HB DEBUG: avy {} avz {}\n",av[i][1],av[i][2]);
-        //utils::logmesg(lmp,"Current Time is {} \n", tlast[i]);
+        
         //utils::logmesg(lmp,"Current Temperature is {} \n",Tbl);
-        vscale=sqrt(new_kienergy/old_kienergy);
-        vscale=vscale*mix_coeff+(1-mix_coeff);
+        vscale=sqrt((1-mix_coeff+mix_coeff*new_kienergy/old_kienergy));
+        energy_loss+=(mix_coeff*(old_kienergy-new_kienergy))*1e7/NA;  // use the standard unit
+        //sum_kienergy+=mix_coeff*new_kienergy+(1-mix_coeff)*old_kienergy;
+        //utils::logmesg(lmp,"Current time is {}, energy loss is {} \n", update->ntimestep, energy_loss);
         av[i][0]*=vscale;
         av[i][1]*=vscale;
         av[i][2]*=vscale;
@@ -433,19 +470,27 @@ void FixWallMDHeatbath::post_force(int vflag)
 
   if (onflag) error->one(FLERR, "Particle outside surface of region used in fix wall/region");
   MPI_Allreduce(&numatoms, &sumnumatoms, 1, MPI_INT, MPI_SUM, world);
+  MPI_Allreduce(&energy_loss,&sumenergyloss,1,MPI_DOUBLE,MPI_SUM,world);
   MPI_Allreduce(virial, fix_stress, 6, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(pair_virial, pair_stress, 6, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(ke_virial,ke_stress,6,MPI_DOUBLE,MPI_SUM,world);
-
+  //utils::logmesg(lmp,"In step {}, sumenergyloss is {}\n",update->ntimestep,sumenergyloss);
   fix_stress_sum=(fix_stress[0]+fix_stress[1]+fix_stress[2])*nktv2p;
   pair_stress_sum=(pair_stress[0]+pair_stress[1]+pair_stress[2])*nktv2p;
   ke_stress_sum=(ke_stress[0]+ke_stress[1]+ke_stress[2])*nktv2p;
-
+  gasshellenergy=(ke_stress[0]+ke_stress[1]+ke_stress[2])*1.0/(2.0*mvv2e);
   //calculate the pressure
   stress_all=fix_stress_sum+pair_stress_sum+ke_stress_sum;
   region->stress=stress_all;
   region->numatoms=sumnumatoms;
-  if(update->ntimestep%10000==0)
+  region->SL_Tblgas=gasshellenergy*1e7/(3.0/2.0*KB*NA*sumnumatoms*scalefactor);
+
+  if(deltastyle==VARIABLE)
+  {
+    //utils::logmesg(lmp,"liquid energy is {}, sumenergyloss is {}\n",liquidenergy,sumenergyloss);
+    Tbl_update(region->SL_radius,region->SL_lastradius,delta,olddelta);
+  }
+  if(update->ntimestep%1000==0)
     {
       //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, ke stress equals {}, fix stress equals {}, pair stress equals {}\n",update->ntimestep,ke_stress_sum,fix_stress_sum,pair_stress_sum);
       //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, number equals {}\n",update->ntimestep,sumnumatoms);
@@ -611,15 +656,106 @@ void FixWallMDHeatbath::variable_check()
     if (!input->variable->equalstyle(Tblvar))
       error->all(FLERR, "Variable {} for  heat bath wall is invalid style", Tblstr);
   }
+  if (deltastyle == VARIABLE) {
+    deltavar=input->variable->find(deltastr);
+    if (deltavar < 0) error->all(FLERR, "Variable {} for heat bath wall does not exist", deltastr);
+    if (!input->variable->equalstyle(deltavar))
+      error->all(FLERR, "Variable {} for  heat bath wall is invalid style", deltastr);
+  }
   
 }
 
 void FixWallMDHeatbath::temp_update()
 {
-  if (Tblstyle == VARIABLE) 
+  if (Tblstyle == VARIABLE && deltastyle != VARIABLE) 
   {
+    Tblold=Tbl;
     Tbl= scalefactor*input->variable->compute_equal(Tblvar);
-  //utils::logmesg(lmp,"Current Temperature is {} \n",Tbl);
+    //utils::logmesg(lmp,"Current Temperature is {} \n",Tbl);
   }
   if (Tbl < 0.0) error->one(FLERR, "Variable evaluation in heat bath boundary gave bad value");
+}
+
+void FixWallMDHeatbath::delta_update(Region *region)
+{
+  //utils::logmesg(lmp,"Deltastr is {}\n",deltastr);
+  //utils::logmesg(lmp,"Delta update begins! Delta style is Constant {} Variable {} Auto {}\n",deltastyle==CONSTANT,deltastyle==VARIABLE,deltastyle==AUTO);
+  if (deltastyle == VARIABLE) 
+  {
+    olddelta=delta;
+    delta= input->variable->compute_equal(deltavar);
+    diffdelta=delta-olddelta;
+    //utils::logmesg(lmp,"Current delta is {} \n",delta);
+  }
+  else if (deltastyle == AUTO)
+  {
+    olddelta=delta;
+    delta=region->SL_delta; 
+    diffdelta=delta-olddelta;
+  }
+  if (delta < 0.0) error->one(FLERR, "Variable delta evaluation in heat bath boundary gave bad value");
+  
+}
+
+void FixWallMDHeatbath::Tbl_update(const double R, const double oldR, const double delta, const double olddelta )
+{
+  //all calulation based on standard units
+
+  // oldoutshell=R+delta+dR+ddelta;
+  //double newoutshell=R+delta;
+  //double oldinshell= R+dR;
+  //double newinshell= R;
+  double stan_R=R*1e-10;
+  double stan_delta=delta*1e-10;
+  double stan_oldR=oldR*1e-10;
+  double stan_olddelta=olddelta*1e-10;
+
+  double oldvolume=4.0*MY_PI*(powint(stan_oldR+stan_olddelta,3)-powint(stan_oldR,3))/3.0;
+  double newvolume=4.0*MY_PI*(powint(stan_R+stan_delta,3)-powint(stan_R,3))/3.0;
+  //E_qold+(V-Vold)*Tinfty=E_qnew+(V-Vnew)*Tinfty  ->  E_qnew=E_qold+(VnewV-old)*Tinfty
+  double shellvolume=newvolume-oldvolume;
+  //double shellvolume=4.0*MY_PI*(powint(stan_R,2)*stan_dR-powint(stan_R+stan_delta,2)*(stan_dR+stan_ddelta)); //positive in the start of collapse
+  double energyshell=shellvolume*density*capacity*Tinfty;  
+  //energyshell=0.0;
+  //double energyshell= 4.0*MY_PI*(R+delta)*(R+delta)*ddelta*density*capacity*Tinfty*1e-15;
+  //energyshell-=4.0*MY_PI*R*R*dR*density*capacity*Tinfty*1e-15;
+
+  //double benchmarkenergy=cal_liquid_energy(R);
+  //utils::logmesg(lmp,"Energy Loss is {} \n",sumenergyloss);
+  if(update->ntimestep%10000==0)
+  {
+    utils::logmesg(lmp,"Current Temperature is {} \n",Tbl/scalefactor);
+    //utils::logmesg(lmp,"ddelta is {}, vradius is {} \n",ddelta,dR);
+    //utils::logmesg(lmp,"Liquid Energy is {} \n",liquidenergy);
+    //utils::logmesg(lmp,"Benchmark energy is {} \n",benchmarkenergy);
+    //utils::logmesg(lmp,"Energy Loss is {} \n",sumenergyloss);
+    //utils::logmesg(lmp,"Current energyshell is {} \n",energyshell);
+  }
+  //liquidenergy=liquidenergy+energyshell; // subtract the loss of the energy
+  liquidenergy=liquidenergy+sumenergyloss+energyshell; // subtract the loss of the energy
+
+ 
+  double Tblcoeff=density*capacity*(2.0*stan_delta*MY_PI*(10.0*powint(stan_R,2) + powint(stan_delta,2) +5*stan_R*stan_delta))/15.0;
+  double constcoeff=density*capacity*(2.0*stan_delta*MY_PI*(20.0*powint(stan_R,2)*Tinfty+ 9.0*Tinfty*powint(stan_delta,2)+ 25.0*stan_R*Tinfty*stan_delta ))/15.0;
+  Tblold=Tbl;
+  Tbl=(liquidenergy-constcoeff)/Tblcoeff;
+  //Tbl=liquidenergy/(newvolume*density*capacity);
+
+  //if(update->ntimestep%1000==0)
+  //utils::logmesg(lmp,"Tbl Temperature is {}, liquid energy is {}, sumenergyloss is {}\n",Tbl/scalefactor,liquidenergy,sumenergyloss);
+  
+}
+
+double FixWallMDHeatbath::cal_liquid_energy(const double R, const double delta)
+{
+  //all calulation based on standard units
+  //utils::logmesg(lmp,"In step {}, currrent R is {}\n",update->ntimestep,R);
+ double stan_R=R*1e-10;
+ double stan_delta=delta*1e-10;
+ double Tblcoeff=density*capacity*(2*stan_delta*MY_PI*(10*powint(stan_R,2) + powint(stan_delta,2) +5*stan_R*stan_delta))/15.0;
+ double constcoeff=density*capacity*(2*stan_delta*MY_PI*(20*powint(stan_R,2)*Tinfty+ 9*Tinfty*powint(stan_delta,2)+ 25*stan_R*Tinfty*stan_delta ))/15;
+ //utils::logmesg(lmp,"Tblcoeff is {}, constcoeff is {}\n",Tblcoeff,constcoeff);
+ //double constenergy=Tbl*density*capacity*4.0*MY_PI*(powint(stan_R+stan_delta,3)-powint(stan_R,3))/3.0;
+ return Tblcoeff*Tbl+constcoeff;
+ //return constenergy;
 }

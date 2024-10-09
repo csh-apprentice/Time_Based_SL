@@ -592,7 +592,7 @@ void FixWallHeatbath::temp_update()
   if (Tblstyle == VARIABLE) 
   {
     Tbl= scalefactor*input->variable->compute_equal(Tblvar);
-  //utils::logmesg(lmp,"Current Temperature is {} \n",Tbl);
+    utils::logmesg(lmp,"Current Temperature is {} \n",Tbl);
   }
   if (Tbl < 0.0) error->one(FLERR, "Variable evaluation in heat bath boundary gave bad value");
 }

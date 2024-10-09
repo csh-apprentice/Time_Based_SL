@@ -272,7 +272,7 @@ void PairLJCutIO::compute(int eflag, int vflag)
           evdwl = r6inv * (lj3[itype][jtype] * r6inv - lj4[itype][jtype]) - offset[itype][jtype];
           evdwl *= factor_lj;
         }
-        utils::logmesg(lmp,"IODEBUG FINAL: evflag {}\n",evflag);
+        //utils::logmesg(lmp,"IODEBUG FINAL: evflag {}\n",evflag);
         //           update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id);
         if (evflag) ev_tally(i, j, nlocal, newton_pair, evdwl, 0.0, fpair, delx, dely, delz);
       }

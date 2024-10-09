@@ -1755,3 +1755,53 @@ void Group::omega(double *angmom, double inertia[3][3], double *w)
     MathExtra::angmom_to_omega(angmom,ex,ey,ez,idiag,w);
   }
 }
+
+/* ----------------------------------------------------------------------
+   SL mode, return the radius of the bubble
+------------------------------------------------------------------------- */
+
+double Group::SL_radius(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_radius;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the velocity of the bubble
+------------------------------------------------------------------------- */
+
+double Group::SL_vradius(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_vradius;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the number of atoms in the gas shell
+------------------------------------------------------------------------- */
+
+double Group::SL_count(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->numatoms;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the pressure in the gas shell
+------------------------------------------------------------------------- */
+
+double Group::SL_pressure(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->pressure;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the pressure in the gas shell
+------------------------------------------------------------------------- */
+
+double Group::SL_gastemp(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_Tblgas;
+}

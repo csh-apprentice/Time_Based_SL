@@ -3891,7 +3891,9 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
       strcmp(word,"bound") != 0 && strcmp(word,"gyration") != 0 &&
       strcmp(word,"ke") != 0 && strcmp(word,"angmom") != 0 &&
       strcmp(word,"torque") != 0 && strcmp(word,"inertia") != 0 &&
-      strcmp(word,"omega") != 0)
+      strcmp(word,"omega") != 0 && strcmp(word,"slradius") &&
+      strcmp(word,"slvradius") != 0 && strcmp(word,"slcount") &&
+      strcmp(word,"slpressure") != 0 && strcmp(word,"slgastemp"))
     return 0;
 
   // parse contents for comma-separated args
@@ -4083,6 +4085,21 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
     else if (strcmp(args[1],"y") == 0) value = omega[1];
     else if (strcmp(args[1],"z") == 0) value = omega[2];
     else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slradius") == 0) {
+    if (narg == 2) value = group->SL_radius(igroup,region_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slvradius") == 0) {
+    if (narg == 2) value = group->SL_vradius(igroup,region_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slcount") == 0) {
+    if (narg == 2) value = group->SL_count(igroup,region_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slpressure") == 0) {
+    if (narg == 2) value = group->SL_pressure(igroup,region_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slgastemp") == 0) {
+    if (narg == 2) value = group->SL_gastemp(igroup,region_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
   }
 
   // delete stored args
@@ -4112,6 +4129,20 @@ Region *Variable::region_function(char *id, int ivar)
   // init region in case sub-regions have been deleted
 
   region->init();
+  return region;
+}
+
+/* ---------------------------------------------------------------------- */
+
+Region *Variable::slregion_function(char *id, int ivar)
+{
+  auto region = domain->get_region_by_id(id);
+  if (!region)
+    print_var_error(FLERR, fmt::format("Region {} in variable formula does not exist", id), ivar);
+
+  // init region in case sub-regions have been deleted
+
+  //region->init();
   return region;
 }
 

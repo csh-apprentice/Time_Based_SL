@@ -66,6 +66,13 @@ class Group : protected Pointers {
   void inertia(int, double *, double[3][3], Region *);
   void omega(double *, double[3][3], double *);    // angular velocity
 
+  // code for SL
+  double SL_radius(int, Region *);   //radius of the bubble
+  double SL_vradius(int, Region *);  // vradius of the bubble
+  double SL_count(int, Region *);   // number of atoms in the gas shell
+  double SL_pressure(int, Region *);  // pressure of gas shell
+  double SL_gastemp(int, Region *);  // temperature of gas shell
+
  private:
   int me;
   std::map<tagint, int> *hash;

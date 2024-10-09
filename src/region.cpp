@@ -39,7 +39,11 @@ Region::Region(LAMMPS *lmp, int /*narg*/, char **arg) :
   xstr = ystr = zstr = tstr = nullptr;
   dx = dy = dz = 0.0;
 
+  stress=0.0;
   pressure=0.0;
+  numatoms=0.0;
+  SL_radius=0.0;
+  SL_lastradius=0.0;
 
   size_restart = 5;
   Region::reset_vel();
