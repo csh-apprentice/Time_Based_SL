@@ -72,6 +72,8 @@ class Group : protected Pointers {
   double SL_count(int, Region *);   // number of atoms in the gas shell
   double SL_pressure(int, Region *);  // pressure of gas shell
   double SL_gastemp(int, Region *);  // temperature of gas shell
+  double SL_walltemp(int, Region *);  // temperature of liquid wall
+  double SL_delta(int, Region *);  // thickness of the liquid shell
 
  private:
   int me;

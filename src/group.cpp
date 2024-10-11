@@ -1797,11 +1797,31 @@ double Group::SL_pressure(int igroup, Region *region)
 }
 
 /* ----------------------------------------------------------------------
-   SL mode, return the pressure in the gas shell
+   SL mode, return the temperature in the gas wall
 ------------------------------------------------------------------------- */
 
 double Group::SL_gastemp(int igroup, Region *region)
 {
   //region->prematch();
   return region->SL_Tblgas;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the temperature in the liquid shell
+------------------------------------------------------------------------- */
+
+double Group::SL_walltemp(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_Tblliquid;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the temperature in the liquid shell
+------------------------------------------------------------------------- */
+
+double Group::SL_delta(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_delta;
 }

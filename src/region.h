@@ -73,8 +73,9 @@ class Region : protected Pointers {
   double SL_vradius; // velocity used to communicate wall and the bubble
   //double Sl_gashellenergy; // total energy of the gas shell
   double SL_Tblgas;  // gas shell temperature
+  double SL_Tblgasold;  // last gas shell temperature
   double SL_Tblliquid;  //liquid shell temperature
-  double SL_Tblliquidold;  //liquid shell temperature
+  double SL_Tblliquidold;  //last liquid shell temperature
   double SL_delta;  // thickness of the liquid shell
   double SL_deltaold;  // last frame thickness of the liquid shell
 

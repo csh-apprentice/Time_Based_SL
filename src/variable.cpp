@@ -3893,7 +3893,8 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
       strcmp(word,"torque") != 0 && strcmp(word,"inertia") != 0 &&
       strcmp(word,"omega") != 0 && strcmp(word,"slradius") &&
       strcmp(word,"slvradius") != 0 && strcmp(word,"slcount") &&
-      strcmp(word,"slpressure") != 0 && strcmp(word,"slgastemp"))
+      strcmp(word,"slpressure") != 0 && strcmp(word,"slgastemp") &&
+      strcmp(word,"slwalltemp") != 0 && strcmp(word,"sldelta"))
     return 0;
 
   // parse contents for comma-separated args
@@ -4086,19 +4087,25 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
     else if (strcmp(args[1],"z") == 0) value = omega[2];
     else print_var_error(FLERR,group_errmesg,ivar);
   } else if (strcmp(word,"slradius") == 0) {
-    if (narg == 2) value = group->SL_radius(igroup,region_function(args[1],ivar));
+    if (narg == 2) value = group->SL_radius(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
   } else if (strcmp(word,"slvradius") == 0) {
-    if (narg == 2) value = group->SL_vradius(igroup,region_function(args[1],ivar));
+    if (narg == 2) value = group->SL_vradius(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
   } else if (strcmp(word,"slcount") == 0) {
-    if (narg == 2) value = group->SL_count(igroup,region_function(args[1],ivar));
+    if (narg == 2) value = group->SL_count(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
   } else if (strcmp(word,"slpressure") == 0) {
-    if (narg == 2) value = group->SL_pressure(igroup,region_function(args[1],ivar));
+    if (narg == 2) value = group->SL_pressure(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
   } else if (strcmp(word,"slgastemp") == 0) {
-    if (narg == 2) value = group->SL_gastemp(igroup,region_function(args[1],ivar));
+    if (narg == 2) value = group->SL_gastemp(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slwalltemp") == 0) {
+    if (narg == 2) value = group->SL_walltemp(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"sldelta") == 0) {
+    if (narg == 2) value = group->SL_delta(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
   }
 

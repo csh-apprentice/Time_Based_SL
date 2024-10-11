@@ -62,24 +62,18 @@ class FixWallMDHeatbath : public Fix {
   int sumnumatoms;
   double volume; //volume of the 
   double stress_all;
-  double delta;
   double sumenergyloss;  // loss of the particles' energy when hitting the wall
   double gasshellenergy;  // total energy in the gas shell
 
   int Tblstyle,Tblvar;
-  int deltastyle,deltavar;
   int varshape;   // 1 if change over time 
   char *Tblstr;
-  char *deltastr;
   double scalefactor;   // scale in ensemble particles
   double density;  // density of the liquid
   double capacity;  // heat capacity of liquid
   double Tinfty;   // medium temperature
   double liquidenergy;  // energy of the liquid
 
-  double olddelta;  // delta from the last step
-  double diffdelta; // new delta- old delta
-  
 
   int eflag;
   double ewall[4], ewall_all[4];
@@ -100,7 +94,6 @@ class FixWallMDHeatbath : public Fix {
 
   void variable_check();
   void temp_update();
-  void delta_update(Region *region);
   void Tbl_update(double R, double oldR, double delta, double olddelta); 
   double cal_liquid_energy(double R,double delta);  //R is the bubble radius
 };

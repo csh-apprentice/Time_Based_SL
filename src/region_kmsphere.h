@@ -39,12 +39,6 @@ class RegKMSphere : public Region {
  private:
   double xc, yc, zc;
 
-  int xstyle, xvar;
-  int ystyle, yvar;
-  int zstyle, zvar;
-  int rstyle, svar;
-  char *xstr, *ystr, *zstr, *sstr;
-
   double radius;
   double radius_in;
   double vradius;  // dR
