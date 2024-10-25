@@ -78,6 +78,11 @@ class Region : protected Pointers {
   double SL_Tblliquidold;  //last liquid shell temperature
   double SL_delta;  // thickness of the liquid shell
   double SL_deltaold;  // last frame thickness of the liquid shell
+  double SL_vdelta; // velocity of delta
+  double SL_debug;  // a debug variable that you can use for variables output
+
+  int stepnum;  // average the dTbl/dt over # stepunm
+  double sumdiffTbl;  // sum of the dTbl/dt
 
   int vel_timestep;     // store timestep at which set_velocity was called
                         //   prevents multiple fix/wall/gran/region calls

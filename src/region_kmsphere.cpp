@@ -36,7 +36,7 @@ enum { CONSTANT,VARIABLE, AUTO, MIXING };
 RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
     Region(lmp, narg, arg), deltastr(nullptr)
 {
-  options(narg - 20, &arg[20]);
+  options(narg - 21, &arg[21]);
   xc = xscale * utils::numeric(FLERR, arg[2], false, lmp);
   yc = yscale * utils::numeric(FLERR, arg[3], false, lmp);
   zc = zscale * utils::numeric(FLERR, arg[4], false, lmp);
@@ -56,24 +56,25 @@ RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
   scalefactor=utils::numeric(FLERR, arg[16], false, lmp);
   Tinfty=utils::numeric(FLERR, arg[17], false, lmp)*scalefactor;
   alpha1=utils::numeric(FLERR, arg[18], false, lmp);
+  SL_vdelta=utils::numeric(FLERR, arg[19], false, lmp);
   // delta variable checking
-  if (utils::strmatch(arg[19], "^v_")) {
-    deltastr = utils::strdup(arg[19] + 2);
+  if (utils::strmatch(arg[20], "^v_")) {
+    deltastr = utils::strdup(arg[20] + 2);
     SL_delta=0.0;
     SL_deltaold=0.0;
     deltastyle=VARIABLE;
     varshape=1;
     }
-  else if (utils::strmatch(arg[19], "^m_"))
+  else if (utils::strmatch(arg[20], "^m_"))
   {
-    deltastr = utils::strdup(arg[19] + 2);
+    deltastr = utils::strdup(arg[20] + 2);
     SL_delta=0.0;
     SL_deltaold=0.0;
     deltastyle=MIXING;
     varshape=1;
   }
   else {
-      SL_delta=utils::numeric(FLERR, arg[19], false, lmp);
+      SL_delta=utils::numeric(FLERR, arg[20], false, lmp);
       SL_deltaold=SL_delta;
       deltastyle=AUTO;
     }
@@ -132,6 +133,8 @@ void RegKMSphere::init()
   SL_vradius=vradius;
   pressure=0.0;
   pressure_old=0.0;
+  stepnum=0;
+  sumdiffTbl=0.0;
   if (varshape) variable_check();
   
 }
@@ -227,7 +230,7 @@ void RegKMSphere::shape_update()
   //press=compute_press->scalar;
   volume=4.0*MY_PI/3.0*(radius*radius*radius-radius_in*radius_in*radius_in);
   pressure=-stress/(3.0*volume)*101325;
-  
+  pressure-=2*sigma/(radius*1e-10)+4.0*miu*(vradius*1e5)/(radius*1e-10);
 
   // invoke the RK4 update and log down thw old pressure
   SL_lastradius=radius;
@@ -236,15 +239,26 @@ void RegKMSphere::shape_update()
   {
     delta_update();
     SLRK4(pressure,pressure_old);
+    SLRK4_debug(pressure,pressure_old,SL_Tblliquid,SL_Tblliquidold);
   }
   else if (deltastyle==AUTO)
   {
-    SL_deltaold=SL_delta;
-    SLRK4(pressure,pressure_old,SL_Tblliquid,SL_Tblliquidold);
+    //SL_deltaold=SL_delta;
+    //SLRK4(pressure,pressure_old,SL_Tblliquid,SL_Tblliquidold);
+    //SL_delta=SL_delta+vdelta*update->dt;
 
-    //if(update->ntimestep%1000==0)
-    //utils::logmesg(lmp,"Tbl is {}, Tblold is {} \n",SL_Tblgas/scalefactor,SL_Tblgasold/scalefactor);
-    //SLRK4(pressure,pressure_old,SL_Tblgas,SL_Tblgasold);
+    SL_deltaold=SL_delta;
+    SL_delta=SL_delta+SL_vdelta*update->dt;
+    if(stepnum==40000)
+    {
+      double avgTbl=SL_Tblliquid;
+      double avfdiffTbl=sumdiffTbl/double(stepnum);
+      double avgTblold=avgTbl-avfdiffTbl;
+      SLRK4(pressure,pressure_old,avgTbl,avgTblold);
+      utils::logmesg(lmp,"REGION KMSPHERE, In step {}, avgTbl is {}, avgTblold is {}\n",update->ntimestep,avgTbl,avgTblold);
+      stepnum=0;  //reset the stepnum
+      sumdiffTbl=0.0; //reset the sum of diffTbl
+    }
   }
   else if (deltastyle==MIXING)
   {
@@ -255,7 +269,18 @@ void RegKMSphere::shape_update()
     }
     else {
        SL_deltaold=SL_delta;
-       SLRK4(pressure,pressure_old,SL_Tblliquid,SL_Tblliquidold);
+       
+        if(stepnum==10000)
+        {
+          double avgTbl=SL_Tblliquid;
+          double avfdiffTbl=sumdiffTbl/double(stepnum);
+          double avgTblold=avgTbl-avfdiffTbl;
+          SLRK4(pressure,pressure_old,avgTbl,avgTblold);
+          //utils::logmesg(lmp,"REGION KMSPHERE, In step {}, avgTbl is {}, avgTblold is {}\n",update->ntimestep,avgTbl,avgTblold);
+          stepnum=0;  //reset the stepnum
+          sumdiffTbl=0.0; //reset the sum of diffTbl
+        }
+        SL_delta=SL_delta+SL_vdelta*update->dt;
     }
   }
   
@@ -406,7 +431,7 @@ void RegKMSphere::SLRK4(const double pressure,const double pressure_old, const d
   
   radius=radius+h/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e10;
   vradius=vradius+h/6.0*(k1y2+2.0*k2y2+2.0*k3y2+k4y2)*1e-5;
-  SL_delta=SL_delta+h/6.0*(k1y3+2.0*k2y3+2.0*k3y3+k4y3)*1e10;
+  SL_vdelta=h/6.0*(k1y3+2.0*k2y3+2.0*k3y3+k4y3)*1e10;
   //double debugvradius=1.0/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e-5;
   //utils::logmesg(lmp,"debugvradius is {},calculated vradius is {} \n",debugvradius,vradius);
   //utils::logmesg(lmp,"k1y1 is {}, k2y1 is {}, k3y1 is {}, k4y1 is {}, calculated vradius is {} \n",k1y1,k2y1,k3y1,k4y1,vradius);
@@ -426,7 +451,7 @@ double RegKMSphere::calf3(double update_t, double update_radius, double update_v
   double numerator=6*alpha1/update_delta-(2.0*update_delta/update_radius+1.0/2.0*powint((update_delta/update_radius),2))*update_vradius-update_delta*(1.0+update_delta/(2.0*update_radius)+1.0/10.0*powint((update_delta/update_radius),2))*1.0/(Tbl-Tinfty)*diffTbl;
   double f3=numerator/denominator;
   //if(update->ntimestep%1000==0)
-  utils::logmesg(lmp,"numerator is {}, denominator is {}, Tbl is {}, Tblold is {}, delta is {}, deltaold is {} \n",numerator,denominator,Tbl,Tbl_old,SL_delta,SL_deltaold);
+  //utils::logmesg(lmp,"numerator is {}, denominator is {}, Tbl is {}, Tblold is {}, delta is {}, deltaold is {} \n",numerator,denominator,Tbl,Tbl_old,SL_delta,SL_deltaold);
   //return standard output
   return f3;
 }
@@ -439,8 +464,47 @@ void RegKMSphere::delta_update()
   {
     SL_deltaold=SL_delta;
     SL_delta= input->variable->compute_equal(deltavar);
+    SL_vdelta=SL_delta-SL_deltaold;
     //utils::logmesg(lmp,"In step {}, Current delta is {} \n",update->ntimestep,SL_delta);
   }
   if (SL_delta < 0.0) error->one(FLERR, "Variable delta evaluation in heat bath boundary gave bad value");
   
+}
+
+void RegKMSphere::SLRK4_debug(const double pressure,const double pressure_old, const double Tbl, const double Tbl_old)
+{
+  // y1: position
+  // y2: velocity
+  // dy1/dt=y2
+  // dy2/dt=ddR
+
+  double h=(update->dt*1e-15/force->femtosecond);
+  double current_t=(tstart+update->ntimestep*update->dt)*1e-15/force->femtosecond;
+  double diffpress=(pressure-pressure_old)/h;
+  double diffTbl=(Tbl-Tbl_old)/h;
+  double k1y1=vradius*1e5;   // standard unit
+  double k1y2=calf2(current_t,radius*1e-10,vradius*1e5,pressure,pressure_old);
+  double k1y3=calf3(current_t,radius*1e-10,vradius*1e5,SL_delta*1e-10,Tbl,Tbl_old);
+  
+  // h*k1y2 -> standard unit
+  double k2y1=vradius*1e5+(h*k1y2/2.0);
+  double k2y2=calf2(current_t+h/2.0,radius*1e-10+h/2.0*k1y1,vradius*1e5+h/2.0*k1y2,pressure,pressure_old);
+  double k2y3=calf3(current_t+h/2.0,radius*1e-10+h/2.0*k1y1,vradius*1e5+h/2.0*k1y2,SL_delta*1e-10+h/2.0*k1y3,Tbl,Tbl_old);
+
+  double k3y1=vradius*1e5+(h*k2y2/2.0);
+  double k3y2=calf2(current_t+h/2.0,radius*1e-10+h/2.0*k2y1,vradius*1e5+h/2.0*k2y2,pressure,pressure_old);
+  double k3y3=calf3(current_t+h/2.0,radius*1e-10+h/2.0*k2y1,vradius*1e5+h/2.0*k2y2,SL_delta*1e-10+h/2.0*k2y3,Tbl,Tbl_old);
+
+  double k4y1=vradius*1e5+(h*k3y1);
+  double k4y2=calf2(current_t+h,radius*1e-10+h*k3y1,vradius*1e5+h*k3y2,pressure,pressure_old);
+  double k4y3=calf3(current_t+h,radius*1e-10+h*k3y1,vradius*1e5+h*k3y2,SL_delta*1e-10+h*k3y3,Tbl,Tbl_old);
+  
+  SL_debug=h/6.0*(k1y3+2.0*k2y3+2.0*k3y3+k4y3)*1e10;
+  //double debugvradius=1.0/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e-5;
+  //utils::logmesg(lmp,"debugvradius is {},calculated vradius is {} \n",debugvradius,vradius);
+  //utils::logmesg(lmp,"k1y1 is {}, k2y1 is {}, k3y1 is {}, k4y1 is {}, calculated vradius is {} \n",k1y1,k2y1,k3y1,k4y1,vradius);
+  //utils::logmesg(lmp,"k1y2 is {}, k2y2 is {}, k3y2 is {}, k4y2 is {} \n",k1y2,k2y2,k3y2,k4y2);
+  //if(update->ntimestep%1000==0)
+  //utils::logmesg(lmp,"k1y3 is {}, k2y3 is {}, k3y3 is {}, k4y3 is {}, Tbl is {}, Tblold is {}, delta is {} \n",k1y3,k2y3,k3y3,k4y3,Tbl,Tbl_old,SL_delta);
+
 }

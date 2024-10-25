@@ -74,7 +74,9 @@ class Group : protected Pointers {
   double SL_gastemp(int, Region *);  // temperature of gas shell
   double SL_walltemp(int, Region *);  // temperature of liquid wall
   double SL_delta(int, Region *);  // thickness of the liquid shell
-
+  double SL_vdelta(int, Region *);  // velocity of thickness of the liquid shell
+  double SL_numatoms(int, Region *);  // number of atoms in the gas shell
+  double SL_debug(int, Region *); // print out debug variable
  private:
   int me;
   std::map<tagint, int> *hash;

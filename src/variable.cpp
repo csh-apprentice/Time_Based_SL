@@ -3894,7 +3894,9 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
       strcmp(word,"omega") != 0 && strcmp(word,"slradius") &&
       strcmp(word,"slvradius") != 0 && strcmp(word,"slcount") &&
       strcmp(word,"slpressure") != 0 && strcmp(word,"slgastemp") &&
-      strcmp(word,"slwalltemp") != 0 && strcmp(word,"sldelta"))
+      strcmp(word,"slwalltemp") != 0 && strcmp(word,"sldelta") &&
+      strcmp(word,"slvdelta") && strcmp(word,"slnumatoms")!=0 && 
+      strcmp(word,"sldebug")!=0)
     return 0;
 
   // parse contents for comma-separated args
@@ -4106,6 +4108,15 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
     else print_var_error(FLERR,group_errmesg,ivar);
   } else if (strcmp(word,"sldelta") == 0) {
     if (narg == 2) value = group->SL_delta(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"slvdelta") == 0) {
+    if (narg == 2) value = group->SL_vdelta(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  }else if (strcmp(word,"slnumatoms") == 0) {
+    if (narg == 2) value = group->SL_numatoms(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"sldebug") == 0) {
+    if (narg == 2) value = group->SL_debug(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
   }
 

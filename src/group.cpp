@@ -1817,11 +1817,42 @@ double Group::SL_walltemp(int igroup, Region *region)
 }
 
 /* ----------------------------------------------------------------------
-   SL mode, return the temperature in the liquid shell
+   SL mode, return the thickness in the liquid shell
 ------------------------------------------------------------------------- */
 
 double Group::SL_delta(int igroup, Region *region)
 {
   //region->prematch();
   return region->SL_delta;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the vdelta in the liquid shell
+------------------------------------------------------------------------- */
+
+double Group::SL_vdelta(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_vdelta;
+}
+
+
+/* ----------------------------------------------------------------------
+   SL mode, return the temperature in the liquid shell
+------------------------------------------------------------------------- */
+
+double Group::SL_numatoms(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_delta;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the debug variable
+------------------------------------------------------------------------- */
+
+double Group::SL_debug(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_debug;
 }

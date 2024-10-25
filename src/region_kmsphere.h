@@ -61,9 +61,12 @@ class RegKMSphere : public Region {
   double scalefactor;  //scale the temperature
   double Tinfty; // standard pressure
   double alpha1;  // thermal diffusivity of liquid
+  
 
   int deltastyle,deltavar;
   char *deltastr;
+
+
   
   //double 
   void variable_check();
@@ -73,6 +76,8 @@ class RegKMSphere : public Region {
   // contains delta
   void SLRK4(double pressure, double pressure_old, double Tbl, double Tbl_old);
   double calf3(double update_t, double update_radius, double update_vradius, double delta, double Tbl, double Tbl_old);
+
+  void SLRK4_debug(double pressure, double pressure_old, double Tbl, double Tbl_old);  // don't change the varaible
 };
 
 }    // namespace LAMMPS_NS

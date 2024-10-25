@@ -466,6 +466,11 @@ void FixWallMDHeatbath::post_force(int vflag)
   Tbl_update(region->SL_radius,region->SL_lastradius,region->SL_delta,region->SL_deltaold);
   region->SL_Tblliquidold=Tblold;
   region->SL_Tblliquid=Tbl;
+  if(update->ntimestep>=100000)
+  {
+    region->sumdiffTbl+=(Tbl-Tblold);
+    region->stepnum++;
+  }
   if(update->ntimestep%1000==0)
     {
       //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, ke stress equals {}, fix stress equals {}, pair stress equals {}\n",update->ntimestep,ke_stress_sum,fix_stress_sum,pair_stress_sum);
