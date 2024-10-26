@@ -56,8 +56,11 @@ class FixWallMDHeatbath : public Fix {
   double pair_virial[6]; //pair virial in differnent procs;
   double pair_stress[6]; //stress contribute to pair
 
-  double ke_virial[6]; //stress virial in 
-  double ke_stress[6]; //stress con
+  double kspace_virial[6]; // kspace virial in diffrent procs;
+  double kspace_stress[6]; // stress contribute to the kspace
+
+  double ke_virial[6]; // kinetic in diffrent procs;
+  double ke_stress[6]; //stress contribute to the kinetic
 
   int sumnumatoms;
   double volume; //volume of the 

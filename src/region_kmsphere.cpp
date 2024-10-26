@@ -230,6 +230,7 @@ void RegKMSphere::shape_update()
   //press=compute_press->scalar;
   volume=4.0*MY_PI/3.0*(radius*radius*radius-radius_in*radius_in*radius_in);
   pressure=-stress/(3.0*volume)*101325;
+  pb=pressure;
   pressure-=2*sigma/(radius*1e-10)+4.0*miu*(vradius*1e5)/(radius*1e-10);
 
   // invoke the RK4 update and log down thw old pressure

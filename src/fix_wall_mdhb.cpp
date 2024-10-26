@@ -27,6 +27,7 @@
 #include "modify.h"
 #include "force.h"
 #include "pair.h"
+#include "kspace.h"
 
 #include <cmath>
 #include <cstring>
@@ -289,6 +290,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   double *am=atom->rmass;
   double *radius = atom->radius;
   double **pair_vatom = force->pair->vatom;
+  double **kspace_vatom= force->kspace->vatom;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
   int *tlast=atom->ivector[0];
@@ -307,10 +309,12 @@ void FixWallMDHeatbath::post_force(int vflag)
   double nktv2p = -force->nktv2p;
   double fix_stress_sum=0.0;
   double pair_stress_sum=0.0;
+  double kspace_stress_sum=0.0;
   double ke_stress_sum=0.0;
   double energy_loss=0.0;
 
   pair_virial[0]=pair_virial[1]=pair_virial[2]=pair_virial[3]=pair_virial[4]=pair_virial[5]=0.0;
+  kspace_virial[0]=kspace_virial[1]=kspace_virial[2]=kspace_virial[3]=kspace_virial[4]=kspace_virial[5]=0.0;
   ke_virial[0]=ke_virial[1]=ke_virial[2]=ke_virial[3]=ke_virial[4]=ke_virial[5]=0.0;
   //int numatoms=0;  //number of atoms in the shell
 
@@ -432,6 +436,14 @@ void FixWallMDHeatbath::post_force(int vflag)
         pair_virial[3]+=pair_vatom[i][3];
         pair_virial[4]+=pair_vatom[i][4];
         pair_virial[5]+=pair_vatom[i][5];
+
+        //adding the ksapce stress of the group
+        kspace_virial[0]+=kspace_vatom[i][0];
+        kspace_virial[1]+=kspace_vatom[i][1];
+        kspace_virial[2]+=kspace_vatom[i][2];
+        kspace_virial[3]+=kspace_vatom[i][3];
+        kspace_virial[4]+=kspace_vatom[i][4];
+        kspace_virial[5]+=kspace_vatom[i][5];
         //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, current pair_vatom {} equals {}\n",update->ntimestep,i,pair_vatom[i][0]);
 
         //adding the ke stress of the group 
@@ -450,14 +462,16 @@ void FixWallMDHeatbath::post_force(int vflag)
   MPI_Allreduce(&energy_loss,&sumenergyloss,1,MPI_DOUBLE,MPI_SUM,world);
   MPI_Allreduce(virial, fix_stress, 6, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(pair_virial, pair_stress, 6, MPI_DOUBLE, MPI_SUM, world);
+  MPI_Allreduce(kspace_virial, kspace_stress, 6, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(ke_virial,ke_stress,6,MPI_DOUBLE,MPI_SUM,world);
   //utils::logmesg(lmp,"In step {}, sumenergyloss is {}\n",update->ntimestep,sumenergyloss);
   fix_stress_sum=(fix_stress[0]+fix_stress[1]+fix_stress[2])*nktv2p;
   pair_stress_sum=(pair_stress[0]+pair_stress[1]+pair_stress[2])*nktv2p;
+  kspace_stress_sum=(kspace_stress[0]+kspace_stress[1]+kspace_stress[2])*nktv2p;
   ke_stress_sum=(ke_stress[0]+ke_stress[1]+ke_stress[2])*nktv2p;
   gasshellenergy=(ke_stress[0]+ke_stress[1]+ke_stress[2])*1.0/(2.0*mvv2e);
   //calculate the pressure
-  stress_all=fix_stress_sum+pair_stress_sum+ke_stress_sum;
+  stress_all=fix_stress_sum+pair_stress_sum+kspace_stress_sum+ke_stress_sum;
   region->stress=stress_all;
   region->numatoms=sumnumatoms;
   region->SL_Tblgasold=region->SL_Tblgas;
@@ -471,9 +485,9 @@ void FixWallMDHeatbath::post_force(int vflag)
     region->sumdiffTbl+=(Tbl-Tblold);
     region->stepnum++;
   }
-  if(update->ntimestep%1000==0)
+  if(update->ntimestep%10000==0)
     {
-      //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, ke stress equals {}, fix stress equals {}, pair stress equals {}\n",update->ntimestep,ke_stress_sum,fix_stress_sum,pair_stress_sum);
+      utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, ke stress equals {}, fix stress equals {}, pair stress equals {}, kspace stress is {}\n",update->ntimestep,ke_stress_sum,fix_stress_sum,pair_stress_sum,kspace_stress_sum);
       //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, number equals {}\n",update->ntimestep,sumnumatoms);
     }
 }

@@ -1787,13 +1787,23 @@ double Group::SL_count(int igroup, Region *region)
 }
 
 /* ----------------------------------------------------------------------
-   SL mode, return the pressure in the gas shell
+   SL mode, return the pressure in the gas shell (from outside PB)
 ------------------------------------------------------------------------- */
 
 double Group::SL_pressure(int igroup, Region *region)
 {
   //region->prematch();
   return region->pressure;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the pressure in the gas shell (from inside Pb)
+------------------------------------------------------------------------- */
+
+double Group::SL_pb(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->pb;
 }
 
 /* ----------------------------------------------------------------------

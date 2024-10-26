@@ -66,7 +66,8 @@ class Region : protected Pointers {
   // SL Mode
   double stress; //stress in the current region
   double pressure_old;  //current pressure
-  double pressure;  //pressure of the current region, only ussed in SL mode
+  double pressure;  //pressure of the current region (from outside), only ussed in SL mode
+  double pb;  // pressure of the wall from inside
   int numatoms; //number of atoms in the region
   double SL_radius;  // radius used to communicate wall and the bubble
   double SL_lastradius;  // radius in the last timestep

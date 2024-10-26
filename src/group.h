@@ -70,7 +70,8 @@ class Group : protected Pointers {
   double SL_radius(int, Region *);   //radius of the bubble
   double SL_vradius(int, Region *);  // vradius of the bubble
   double SL_count(int, Region *);   // number of atoms in the gas shell
-  double SL_pressure(int, Region *);  // pressure of gas shell
+  double SL_pressure(int, Region *);  // pressure of gas shell from outside
+  double SL_pb(int, Region *);  // pressure of gas shell from inside
   double SL_gastemp(int, Region *);  // temperature of gas shell
   double SL_walltemp(int, Region *);  // temperature of liquid wall
   double SL_delta(int, Region *);  // thickness of the liquid shell

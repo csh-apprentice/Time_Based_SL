@@ -41,6 +41,7 @@ Region::Region(LAMMPS *lmp, int /*narg*/, char **arg) :
 
   stress=0.0;
   pressure=0.0;
+  pb=0.0;
   numatoms=0.0;
   SL_radius=0.0;
   SL_lastradius=0.0;
