@@ -487,7 +487,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   }
   if(update->ntimestep%10000==0)
     {
-      utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, ke stress equals {}, fix stress equals {}, pair stress equals {}, kspace stress is {}\n",update->ntimestep,ke_stress_sum,fix_stress_sum,pair_stress_sum,kspace_stress_sum);
+      //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, ke stress equals {}, fix stress equals {}, pair stress equals {}, kspace stress is {}\n",update->ntimestep,ke_stress_sum,fix_stress_sum,pair_stress_sum,kspace_stress_sum);
       //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, number equals {}\n",update->ntimestep,sumnumatoms);
     }
 }
