@@ -290,7 +290,10 @@ void FixWallMDHeatbath::post_force(int vflag)
   double *am=atom->rmass;
   double *radius = atom->radius;
   double **pair_vatom = force->pair->vatom;
-  double **kspace_vatom= force->kspace->vatom;
+    // flag Kspace contribution separately, since not summed across procs
+  double **kspace_vatom=nullptr;
+  if (force->kspace) kspaceflag=1; else kspaceflag=0;
+  if(kspaceflag) kspace_vatom= force->kspace->vatom;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
   int *tlast=atom->ivector[0];
@@ -438,12 +441,16 @@ void FixWallMDHeatbath::post_force(int vflag)
         pair_virial[5]+=pair_vatom[i][5];
 
         //adding the ksapce stress of the group
+          // flag Kspace contribution separately, since not summed across procs
+        if (kspaceflag){
         kspace_virial[0]+=kspace_vatom[i][0];
         kspace_virial[1]+=kspace_vatom[i][1];
         kspace_virial[2]+=kspace_vatom[i][2];
         kspace_virial[3]+=kspace_vatom[i][3];
         kspace_virial[4]+=kspace_vatom[i][4];
         kspace_virial[5]+=kspace_vatom[i][5];
+        }
+        
         //utils::logmesg(lmp,"FIX WALL MDHB, IN STEP {}, current pair_vatom {} equals {}\n",update->ntimestep,i,pair_vatom[i][0]);
 
         //adding the ke stress of the group 

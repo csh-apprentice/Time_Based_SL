@@ -77,6 +77,8 @@ class FixWallMDHeatbath : public Fix {
   double Tinfty;   // medium temperature
   double liquidenergy;  // energy of the liquid
 
+  bool kspaceflag;  // whether count in kstress
+
 
   int eflag;
   double ewall[4], ewall_all[4];
