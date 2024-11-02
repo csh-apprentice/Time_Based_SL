@@ -316,6 +316,8 @@ void FixWallMDHeatbath::post_force(int vflag)
   double ke_stress_sum=0.0;
   double energy_loss=0.0;
 
+  int numlost=0; // lost particles in each thread
+
   pair_virial[0]=pair_virial[1]=pair_virial[2]=pair_virial[3]=pair_virial[4]=pair_virial[5]=0.0;
   kspace_virial[0]=kspace_virial[1]=kspace_virial[2]=kspace_virial[3]=kspace_virial[4]=kspace_virial[5]=0.0;
   ke_virial[0]=ke_virial[1]=ke_virial[2]=ke_virial[3]=ke_virial[4]=ke_virial[5]=0.0;
@@ -345,6 +347,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   for (i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
       if (!region->match(x[i][0], x[i][1], x[i][2])) {
+        numlost++;
         onflag = 1;
         continue;
       }
@@ -464,7 +467,8 @@ void FixWallMDHeatbath::post_force(int vflag)
         numatoms++;
       }
     }
-  if (onflag) error->one(FLERR, "Particle outside surface of region used in fix wall/region");
+  //if (onflag) error->one(FLERR, "Particle outside surface of region used in fix wall/region");  // it's okay to lost particles
+  MPI_Allreduce(&numlost, &sumlostparticles, 1, MPI_INT, MPI_SUM, world);
   MPI_Allreduce(&numatoms, &sumnumatoms, 1, MPI_INT, MPI_SUM, world);
   MPI_Allreduce(&energy_loss,&sumenergyloss,1,MPI_DOUBLE,MPI_SUM,world);
   MPI_Allreduce(virial, fix_stress, 6, MPI_DOUBLE, MPI_SUM, world);
@@ -479,6 +483,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   gasshellenergy=(ke_stress[0]+ke_stress[1]+ke_stress[2])*1.0/(2.0*mvv2e);
   //calculate the pressure
   stress_all=fix_stress_sum+pair_stress_sum+kspace_stress_sum+ke_stress_sum;
+  region->lost_partilces=sumlostparticles;
   region->stress=stress_all;
   region->numatoms=sumnumatoms;
   region->SL_Tblgasold=region->SL_Tblgas;

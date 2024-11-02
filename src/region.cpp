@@ -45,6 +45,7 @@ Region::Region(LAMMPS *lmp, int /*narg*/, char **arg) :
   numatoms=0.0;
   SL_radius=0.0;
   SL_lastradius=0.0;
+  lost_partilces=0;
 
   size_restart = 5;
   Region::reset_vel();
