@@ -63,6 +63,7 @@ class FixWallMDHeatbath : public Fix {
   double ke_stress[6]; //stress contribute to the kinetic
 
   int sumnumatoms;
+  int sumlostparticles;  // sum of the losing particles
   double volume; //volume of the 
   double stress_all;
   double sumenergyloss;  // loss of the particles' energy when hitting the wall

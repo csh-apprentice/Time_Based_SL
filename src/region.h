@@ -82,6 +82,8 @@ class Region : protected Pointers {
   double SL_vdelta; // velocity of delta
   double SL_debug;  // a debug variable that you can use for variables output
 
+  int lost_partilces;  // number of lost particles in the simulation
+
   int stepnum;  // average the dTbl/dt over # stepunm
   double sumdiffTbl;  // sum of the dTbl/dt
 
