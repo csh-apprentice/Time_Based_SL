@@ -4,8 +4,8 @@
 clear 
 units real
 dimension 3
-#boundary f f f
-boundary p p p
+# boundary f f f 
+boundary s s s
 atom_style full
 
 # Constants for Ar
@@ -102,7 +102,7 @@ set type 1 i_tlast 0
 
 #create velocity
 variable Tblensem equal ${Tbl}*${scalefactor}
-#velocity all create ${Tblensem} 4928459 rot yes dist uniform
+#velocity all create 2e9 4928459 rot yes dist uniform
 #run 0
 #velocity all scale ${Tblensem}
 print "Tb0 IS ${Tb0}"
@@ -113,15 +113,30 @@ velocity all create ${Tinfty} 4928459 dist young ${Tb0} ${Tbl} ${A} ${B} ${eta} 
 variable cutoff equal 2*${d_ensem}
 variable thickness equal ${MAX_RADIUS}/2
 
+# interaction style: io+coul
+# kspace_style pppm 1e-4
+# kspace_modify gewald 0.01
+# pair_style hybrid/overlay lj/cutio ${cutoff} coul/long ${cutoff}
+# pair_coeff * * lj/cutio 8 ${io1_ensem} ${io2_ensem} ${io3_ensem} ${io4_ensem} ${io5_ensem} ${io6_ensem} ${io7_ensem} ${io8_ensem} ${epsilon_ensem} ${sigma_ensem} 
+# pair_coeff * * coul/long
+# kspace_modify compute yes
+# set type 1 charge 0.0
+#  neighbor        2.0 bin
 
-kspace_style pppm 1e-4
-kspace_modify gewald 0.01
-pair_style hybrid/overlay lj/cutio ${cutoff} coul/long ${cutoff}
-#pair_style lj/cutio ${cutoff}
-#pair_coeff 1 1 8 ${io1_ensem} ${io2_ensem} ${io3_ensem} ${io4_ensem} ${io5_ensem} ${io6_ensem} ${io7_ensem} ${io8_ensem} ${epsilon_ensem} ${sigma_ensem} 
-#pair_coeff * * lj/cutio 8 1520 2670 3930 5770 7240 8780 12000 13800 ${epsilon} ${sigma} 
+#interaction style: io + short coul
+pair_style hybrid/overlay lj/cutio ${cutoff} coul/dsf 0.2 ${cutoff}
 pair_coeff * * lj/cutio 8 ${io1_ensem} ${io2_ensem} ${io3_ensem} ${io4_ensem} ${io5_ensem} ${io6_ensem} ${io7_ensem} ${io8_ensem} ${epsilon_ensem} ${sigma_ensem} 
-pair_coeff * * coul/long
+pair_coeff * * coul/dsf
+# kspace_modify compute yes
+set type 1 charge 0.0
+
+
+
+# interaction style: io only
+# pair_style lj/cutio ${cutoff}
+# pair_coeff * * 8 ${io1_ensem} ${io2_ensem} ${io3_ensem} ${io4_ensem} ${io5_ensem} ${io6_ensem} ${io7_ensem} ${io8_ensem} ${epsilon_ensem} ${sigma_ensem} 
+# set type 1 charge 0.0
+
 #1.52 2.67 3.93 5.77 7.24 8.78 12.0 13.8
 #pair_style lj/cutio $d
 #pair_coeff 1 1 8 1520 2670 3930 5770 7240 8780 12000 13800 ${epsilon} ${sigma} 
@@ -145,7 +160,7 @@ variable Steps2run equal 1e5#2800/${timestep}
 #minimize the energy to aviod overlap
 minimize 1.0e-4 1.0e-4 1000 1000
 #
-dump myDump all custom ${Nstep} ./mddumpfiles/SLMD_1fs_isothermal_coul_*.lammpstrj id type x y z vx vy vz fx fy fz q i_tlast
+#dump myDump all custom ${Nstep} ./mddumpfiles/SLMD_1fs_mix_coul_*.lammpstrj id type x y z vx vy vz fx fy fz q i_tlast
 #dump myDump all custom ${Nstep} ./1_4fscoul/dump_1_4fs_1e5_*.lammpstrj id type x y z vx vy vz fx fy fz q
 #dump myDump all custom 56 dump_1e5_2012_small*.lammpstrj id type x y z vx vy vz fx fy fz q 
 
@@ -191,11 +206,12 @@ region km_sphere kmsphere 0.0 0.0 0.0 ${MAX_RADIUS} ${velocitystart} 1481 1000 1
 #group atoms_shell dynamic all region km_shell
 compute peratom all stress/atom NULL  # DO NOT DELETE !!!!
 variable SLradius equal slradius(all,km_sphere)
-variable RCORE equal ${SLradius}/10.0
-region core sphere 0.0 0.0 0.0 ${RCORE} side in
+variable RCORE equal v_SLradius/10.0
+region core sphere 0.0 0.0 0.0 v_RCORE side in
 variable SLvradius equal slvradius(all,km_sphere) 
 variable SLcount equal slcount(all,km_sphere) 
 variable SLpressure equal slpressure(all,km_sphere)
+variable SLpb equal slpb(all,km_sphere)
 variable SLTblgas equal slgastemp(all,km_sphere)/${scalefactor}
 variable SLTwall equal slwalltemp(all,km_sphere)/${scalefactor}
 variable SLdelta equal sldelta(all,km_sphere)
@@ -207,12 +223,12 @@ compute coretemp all temp/region core
 variable corecount equal count(all,core)
 #compute pout all reduce/region km_sphere_out sum c_peratom[1] c_peratom[2] c_peratom[3]
 #compute pshell all reduce/region km_shell sum c_peratom[1] c_peratom[2] c_peratom[3]
-#compute pcore all reduce/region core sum c_peratom[1] c_peratom[2] c_peratom[3]
+compute pcore all reduce/region core sum c_peratom[1] c_peratom[2] c_peratom[3]
 #compute countnum all 
 #compute psum all reduce/region km_sphere sum c_peratom[1] c_peratom[2] c_peratom[3]
 
 #variable stressshell equal -(c_pshell[1]+c_pshell[2]+c_pshell[3])/(3*4*${pi}*${cutoff}*${MAX_RADIUS}^2)
-#variable stresscore equal -(c_pcore[1]+c_pcore[2]+c_pcore[3])/(4*${pi}*(${MAX_RADIUS}^3-${RADIUSIN}^3))
+variable presscore equal -(c_pcore[1]+c_pcore[2]+c_pcore[3])/(4.0*${pi}*${RCORE}^3)
 
 #fix cache all store/state 1 v_stressshell
 #variable stresssum equal -(c_psum[1]+c_psum[2]+c_psum[3])/(4*${pi}*${MAX_RADIUS}^3)
@@ -221,7 +237,7 @@ variable corecount equal count(all,core)
 #variable stresssum equal -(c_p[1]+c_p[2]+c_p[3])/(3*99010^3)
 
 thermo 1000
-thermo_style custom step temp etotal press c_coretemp v_corecount v_SLradius v_SLvradius v_SLcount v_SLpressure v_SLTblgas v_SLTwall v_SLdelta v_SLnumatoms v_SLvdelta v_SLdebug
+thermo_style custom step temp etotal press c_coretemp v_corecount v_SLradius v_SLvradius v_SLcount v_SLpressure v_SLpb v_SLTblgas v_SLTwall v_SLdelta v_SLnumatoms v_presscore v_SLvdelta v_SLdebug
 #thermo_style custom step temp etotal press
 
 #region km_sphere kmsphere 0.0 0.0 0.0 ${MAX_RADIUS_OUT} -0.02 1481 1000 1e5 0.072 0.001 ${cutoff} v_stresssum side in 
@@ -233,9 +249,8 @@ print "RADIUS start IS ${RADIUS}"
 #fix wall all wall/region bubble_sphere lj126 ${epsilon_ensem} ${sigma_ensem} ${d_ensem}
 #fix wall all wall/mdhb km_sphere lj126 ${epsilon_ensem} ${sigma_ensem} ${cutoff} v_Tbl v_delta 1.0 ${scalefactor} 1000.0 4180.0 300.0
 fix wall all wall/mdhb km_sphere lj126 ${epsilon_water_ensem} ${sigma_water_ensem} ${cutoff} 1.0 ${scalefactor} 1000.0 4180.0 300.0 ${Tbl} 
-#fix wall all wall/mdhb km_sphere lj126 ${epsilon_ensem} ${sigma_ensem} ${cutoff} 1.0 ${scalefactor} 1000.0 4180.0 300.0 300.0 v_delta 
-#fix wall all wall/hb km_sphere lj126 ${epsilon_ensem} ${sigma_ensem} ${cutoff} v_Tbl 1.0 ${scalefactor}
 fix_modify wall virial yes
+
 variable RADIUS  equal next(RADIUS_FILE)
 
 #variable DR equal next(DR_FILE)
@@ -244,14 +259,16 @@ variable delta equal next(DELTA_FILE)
 #read_dump dump_1fs_1e5_525000.lammpstrj 525000 x y z vx vy vz fx fy fz q 
 #read_dump ./1fs_coul/dump_1fs_1e5_525000.lammpstrj 525000 x y z vx vy vz fx fy fz q 
 #read_dump ./whole/dump_1fs_1e5_530000.lammpstrj 530000 x y z vx vy vz fx fy fz q 
+#read_dump ./mddumpfiles/SLMD_1fs_isothermal_coul_4400000.lammpstrj 4400000 x y z vx vy vz fx fy fz q 
+timer full sync
 reset_timestep 0
 
-set type 1 charge 0.0
+
+
+# exploring on the balancing method
+fix rebalance all balance 100000 1.0 shift xyz 10 1.1  #out tmp_sphere_1e5_dsf_periodic_2.balance
+
 #run ${Steps2run}
 run 10000000
 #run 0
 
-print "RADIUS final IS ${RADIUS}"
-print "RADIUSIN final IS ${RADIUSIN}"
-print "RSCALE IS ${rscalefactor}"
-print "CUTOFF IS ${cutoff}"
