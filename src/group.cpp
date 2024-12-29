@@ -1868,6 +1868,16 @@ double Group::SL_debug(int igroup, Region *region)
 }
 
 /* ----------------------------------------------------------------------
+   SL mode, return the steps
+------------------------------------------------------------------------- */
+
+double Group::SL_steps(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->SL_steps;
+}
+
+/* ----------------------------------------------------------------------
    SL mode, return the debug variable
 ------------------------------------------------------------------------- */
 
@@ -1876,3 +1886,4 @@ int Group::SL_lost(int igroup, Region *region)
   //region->prematch();
   return region->lost_partilces;
 }
+

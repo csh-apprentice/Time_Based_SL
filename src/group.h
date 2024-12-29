@@ -78,6 +78,7 @@ class Group : protected Pointers {
   double SL_vdelta(int, Region *);  // velocity of thickness of the liquid shell
   double SL_numatoms(int, Region *);  // number of atoms in the gas shell
   double SL_debug(int, Region *); // print out debug variable
+  double SL_steps(int, Region *); // accumulate steps in SL simulation
 
   int SL_lost(int, Region *); // print out lost particles
  private:

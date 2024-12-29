@@ -827,6 +827,8 @@ void Thermo::parse_fields(const std::string &str)
       addfield("CPU", &Thermo::compute_cpu, FLOAT);
     } else if (word == "tpcpu") {
       addfield("T/CPU", &Thermo::compute_tpcpu, FLOAT);
+    } else if (word == "vcpu")  {
+      addfield("V/CPU", &Thermo::compute_vcpu, FLOAT);
     } else if (word == "spcpu") {
       addfield("S/CPU", &Thermo::compute_spcpu, FLOAT);
     } else if (word == "cpuremain") {
@@ -1259,7 +1261,12 @@ int Thermo::evaluate_keyword(const std::string &word, double *answer)
       error->all(FLERR, "The variable thermo keyword tpcpu cannot be used between runs");
     compute_tpcpu();
 
-  } else if (word == "spcpu") {
+  } else if (word == "vcpu") {
+    if (update->whichflag == 0)
+      error->all(FLERR, "The variable thermo keyword vcpu cannot be used between runs");
+    compute_vcpu();
+
+  }else if (word == "spcpu") {
     if (update->whichflag == 0)
       error->all(FLERR, "The variable thermo keyword spcpu cannot be used between runs");
     compute_spcpu();
@@ -1601,6 +1608,29 @@ void Thermo::compute_cpu()
     dvalue = 0.0;
   else
     dvalue = timer->elapsed(Timer::TOTAL);
+}
+
+void Thermo::compute_vcpu()
+{
+  double new_cpu;
+  double new_time = update->atime + (update->ntimestep - update->atimestep) * update->dt;
+
+  if (firststep == 0) {
+    new_cpu = 0.0;
+    dvalue = 0.0;
+  } else {
+    new_cpu = timer->elapsed(Timer::TOTAL);
+    double cpu_diff = new_cpu - last_vcpu;
+    double time_diff = new_time - last_time_vcpu;
+    if (time_diff > 0.0 && cpu_diff > 0.0)
+      dvalue = time_diff / cpu_diff;
+    else
+      dvalue = 0.0;
+  }
+
+  last_time_vcpu = new_time;
+  last_vcpu = new_cpu;
+
 }
 
 /* ---------------------------------------------------------------------- */

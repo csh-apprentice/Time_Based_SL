@@ -51,8 +51,8 @@ RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
   radius_in=radius-cutoff;
   freq=utils::numeric(FLERR, arg[13], false, lmp);
   w=2.0*MY_PI*freq;
-  PA=utils::numeric(FLERR, arg[14], false, lmp)*101325;
-  tstart=utils::numeric(FLERR, arg[15], false, lmp);
+  PA=utils::numeric(FLERR, arg[14], false, lmp)*101325.0;
+  tstart=utils::numeric(FLERR, arg[15], false, lmp)*1e-10;
   scalefactor=utils::numeric(FLERR, arg[16], false, lmp);
   Tinfty=utils::numeric(FLERR, arg[17], false, lmp)*scalefactor;
   alpha1=utils::numeric(FLERR, arg[18], false, lmp);
@@ -131,10 +131,37 @@ void RegKMSphere::init()
   SL_radius=radius;
   SL_lastradius=radius;
   SL_vradius=vradius;
+  SL_debug=0.0;
   pressure=0.0;
   pressure_old=0.0;
   stepnum=0;
   sumdiffTbl=0.0;
+  simulate_time=0.0;
+  SL_steps=0.0;
+
+  // Theoty initialization
+  th_radius=3.086969205287614e-06;
+  th_vradius=-3.162987025445613e+02;
+  th_aradius=-4.094560456322810e+10;
+  th_Tb0=2.530107262855020e+03;
+  th_delta=2.520848698181851e-07;
+  update_t=tstart;
+
+  th_Tinfty=300.0;
+  th_k1=0.598;
+  th_mygamma=5.0/3.0;
+  th_A=2.682e-5;
+  th_B=1.346e-2;
+  th_initialR=4.5e-6;
+  th_NBC=1.316;
+  th_Pinfty=101325;
+  th_initialrhog=1.603;
+  double gas_mass=(4.0/3.0) * MY_PI * powint(th_initialR,3) * th_initialrhog;
+  th_a=(4.0/3.0) * MY_PI * powint(th_initialR,3) * th_initialrhog * 5.0 / (4.0 * MY_PI) * (1.0 - th_NBC);
+  th_c=(gas_mass-(4.0*MY_PI/5.0)*th_a)*(3.0/(4.0*MY_PI));
+
+
+  // hard coding the input no
   if (varshape) variable_check();
   
 }
@@ -218,86 +245,65 @@ int RegKMSphere::surface_exterior(double *x, double cutoff)
 
 void RegKMSphere::shape_update()
 {
-  
-  if (update->ntimestep>1)
-  {
   //radius=radius+vradius*update->dt;
   radius_in=radius-cutoff;
-  //pressure+=0.1;
-  //auto compute_press=modify->get_compute_by_id(utils::strdup(press_id + 2));
-  //if (!compute_press)
-  //        error->all(FLERR, "Could not find compute ID in KMSPHERE: {}",press_id);
-  //press=compute_press->scalar;
   volume=4.0*MY_PI/3.0*(radius*radius*radius-radius_in*radius_in*radius_in);
   pressure=-stress/(3.0*volume)*101325;
   pb=pressure;
   pressure-=2*sigma/(radius*1e-10)+4.0*miu*(vradius*1e5)/(radius*1e-10);
 
-  // invoke the RK4 update and log down thw old pressure
+  // invoke the RK4 update and log down the old pressure
   SL_lastradius=radius;
-  
-  if (deltastyle==VARIABLE)
-  {
-    delta_update();
-    SLRK4(pressure,pressure_old);
-    SLRK4_debug(pressure,pressure_old,SL_Tblliquid,SL_Tblliquidold);
-  }
-  else if (deltastyle==AUTO)
-  {
-    //SL_deltaold=SL_delta;
-    //SLRK4(pressure,pressure_old,SL_Tblliquid,SL_Tblliquidold);
-    //SL_delta=SL_delta+vdelta*update->dt;
 
-    SL_deltaold=SL_delta;
-    SL_delta=SL_delta+SL_vdelta*update->dt;
-    if(stepnum==40000)
-    {
-      double avgTbl=SL_Tblliquid;
-      double avfdiffTbl=sumdiffTbl/double(stepnum);
-      double avgTblold=avgTbl-avfdiffTbl;
-      SLRK4(pressure,pressure_old,avgTbl,avgTblold);
-      utils::logmesg(lmp,"REGION KMSPHERE, In step {}, avgTbl is {}, avgTblold is {}\n",update->ntimestep,avgTbl,avgTblold);
-      stepnum=0;  //reset the stepnum
-      sumdiffTbl=0.0; //reset the sum of diffTbl
-    }
-  }
-  else if (deltastyle==MIXING)
+  if (update->ntimestep>0)
   {
-    if(update->ntimestep<100000) 
-    {
+      //update the delta and radius
+    switch (deltastyle) {
+    case VARIABLE:
       delta_update();
-      SLRK4(pressure,pressure_old);
-    }
-    else {
-       SL_deltaold=SL_delta;
-       
-        if(stepnum==10000)
-        {
-          double avgTbl=SL_Tblliquid;
-          double avfdiffTbl=sumdiffTbl/double(stepnum);
-          double avgTblold=avgTbl-avfdiffTbl;
-          SLRK4(pressure,pressure_old,avgTbl,avgTblold);
-          //utils::logmesg(lmp,"REGION KMSPHERE, In step {}, avgTbl is {}, avgTblold is {}\n",update->ntimestep,avgTbl,avgTblold);
-          stepnum=0;  //reset the stepnum
-          sumdiffTbl=0.0; //reset the sum of diffTbl
+      SLRK4(pressure, pressure_old);
+      // SLRK4_debug(pressure, pressure_old, SL_Tblliquid, SL_Tblliquidold);
+      theroy_SLRK4();
+      break;
+
+    case AUTO:
+      delta_update();
+      SLRK4(pressure, pressure_old);
+      theroy_SLRK4();
+      break;
+
+    case MIXING:
+      if (update->ntimestep < 1000) {
+        delta_update();
+        SLRK4(pressure, pressure_old);
+      } else {
+        SL_deltaold = SL_delta;
+        SL_delta = SL_delta + SL_vdelta * update->dt;
+
+        if (stepnum >= 2) {
+          double avgTbl = SL_Tblliquid;
+          double avfdiffTbl = sumdiffTbl / double(stepnum);
+          double avgTblold = avgTbl - avfdiffTbl;
+          SLRK4(pressure, pressure_old, avgTbl, avgTblold);
+          // utils::logmesg(lmp, "REGION KMSPHERE, In step {}, avgTbl is {}, avgTblold is {}\n", update->ntimestep, avgTbl, avgTblold);
+          stepnum = 0;  // reset the stepnum
+          sumdiffTbl = 0.0;  // reset the sum of diffTbl
         }
-        SL_delta=SL_delta+SL_vdelta*update->dt;
+        // SL_delta = SL_delta + SL_vdelta * update->dt;
+      }
+      break;
+
+    default:
+      // Handle unexpected deltastyle values if necessary
+      break;
     }
+
   }
   
+  // log down the old pressure
   pressure_old=pressure;
   SL_radius=radius;
   SL_vradius=vradius;
-  
-  }
-  else delta_update();
-
-  if(update->ntimestep%1==0)
-  {
-    //utils::logmesg(lmp,"REGION KMSPHERE, THE Press IN STEP {} IS {}, the RADIUS IS {}, the vradius is {}, number of atoms is {}\n",update->ntimestep,pressure/101325,radius,vradius,numatoms);
-    //utils::logmesg(lmp,"REGION KMSPHERE, In step {}, Current delta is {}, deltaold is {}\n",update->ntimestep,SL_delta,SL_deltaold);
-    
-  }
 
 }
 
@@ -359,10 +365,10 @@ void RegKMSphere::SLRK4(const double pressure,const double pressure_old)
   // y1: position
   // y2: velocity
   // dy1/dt=y2
-  // dy2/dt=ddR
+  // dy2/dt=update_aradius
   
   double h=(update->dt*1e-15/force->femtosecond);
-  double current_t=(tstart+update->ntimestep*update->dt)*1e-15/force->femtosecond;
+  double current_t=simulate_time+tstart;
   double diffpress=(pressure-pressure_old)/h;
   //utils::logmesg(lmp,"SLRK4, Input radius is {}, vradius is {}, diffpress is {}\n",radius,vradius,diffpress);
   double k1y1=vradius*1e5;   // standard unit
@@ -380,6 +386,8 @@ void RegKMSphere::SLRK4(const double pressure,const double pressure_old)
   
   radius=radius+h/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e10;
   vradius=vradius+h/6.0*(k1y2+2.0*k2y2+2.0*k3y2+k4y2)*1e-5;
+  simulate_time+=h;
+  SL_steps+=update->dt;
   //utils::logmesg(lmp,"SLRK4, OUTPUT radius is {}, vradius is {}\n",radius,vradius);
   //double debugvradius=1.0/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e-5;
   //utils::logmesg(lmp,"debugvradius is {},calculated vradius is {} \n",debugvradius,vradius);
@@ -407,10 +415,10 @@ void RegKMSphere::SLRK4(const double pressure,const double pressure_old, const d
   // y1: position
   // y2: velocity
   // dy1/dt=y2
-  // dy2/dt=ddR
+  // dy2/dt=update_aradius
 
   double h=(update->dt*1e-15/force->femtosecond);
-  double current_t=(tstart+update->ntimestep*update->dt)*1e-15/force->femtosecond;
+  double current_t=simulate_time+tstart;
   double diffpress=(pressure-pressure_old)/h;
   double diffTbl=(Tbl-Tbl_old)/h;
   double k1y1=vradius*1e5;   // standard unit
@@ -432,7 +440,10 @@ void RegKMSphere::SLRK4(const double pressure,const double pressure_old, const d
   
   radius=radius+h/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e10;
   vradius=vradius+h/6.0*(k1y2+2.0*k2y2+2.0*k3y2+k4y2)*1e-5;
+  // SL_vdelta=std::min(h/6.0*(k1y3+2.0*k2y3+2.0*k3y3+k4y3)*1e10,SL_vdelta);
   SL_vdelta=h/6.0*(k1y3+2.0*k2y3+2.0*k3y3+k4y3)*1e10;
+  simulate_time+=h;
+  SL_steps+=update->dt;
   //double debugvradius=1.0/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1)*1e-5;
   //utils::logmesg(lmp,"debugvradius is {},calculated vradius is {} \n",debugvradius,vradius);
   //utils::logmesg(lmp,"k1y1 is {}, k2y1 is {}, k3y1 is {}, k4y1 is {}, calculated vradius is {} \n",k1y1,k2y1,k3y1,k4y1,vradius);
@@ -461,12 +472,19 @@ void RegKMSphere::delta_update()
 {
   //utils::logmesg(lmp,"Deltastr is {}\n",deltastr);
   //utils::logmesg(lmp,"Delta update begins! Delta style is Constant {} Variable {} Auto {}\n",deltastyle==CONSTANT,deltastyle==VARIABLE,deltastyle==AUTO);
-  if (deltastyle == VARIABLE || deltastyle==MIXING) 
-  {
+  if (deltastyle == VARIABLE || deltastyle==MIXING) {
     SL_deltaold=SL_delta;
     SL_delta= input->variable->compute_equal(deltavar);
-    SL_vdelta=SL_delta-SL_deltaold;
+    //SL_vdelta=SL_delta-SL_deltaold;
     //utils::logmesg(lmp,"In step {}, Current delta is {} \n",update->ntimestep,SL_delta);
+  }
+  else{
+     // In Auto Mode, delta is borrowed from the thery_SLRK4()
+     SL_deltaold=SL_delta;
+     SL_delta=th_delta*1e10;
+     //if(update->ntimestep%1==0)
+      //utils::logmesg(lmp,"In step {}, Current delta is {} \n",update->ntimestep,SL_delta);
+
   }
   if (SL_delta < 0.0) error->one(FLERR, "Variable delta evaluation in heat bath boundary gave bad value");
   
@@ -477,10 +495,10 @@ void RegKMSphere::SLRK4_debug(const double pressure,const double pressure_old, c
   // y1: position
   // y2: velocity
   // dy1/dt=y2
-  // dy2/dt=ddR
+  // dy2/dt=update_aradius
 
   double h=(update->dt*1e-15/force->femtosecond);
-  double current_t=(tstart+update->ntimestep*update->dt)*1e-15/force->femtosecond;
+  double current_t=tstart+(update->ntimestep*update->dt)*1e-15/force->femtosecond;
   double diffpress=(pressure-pressure_old)/h;
   double diffTbl=(Tbl-Tbl_old)/h;
   double k1y1=vradius*1e5;   // standard unit
@@ -508,4 +526,80 @@ void RegKMSphere::SLRK4_debug(const double pressure,const double pressure_old, c
   //if(update->ntimestep%1000==0)
   //utils::logmesg(lmp,"k1y3 is {}, k2y3 is {}, k3y3 is {}, k4y3 is {}, Tbl is {}, Tblold is {}, delta is {} \n",k1y3,k2y3,k3y3,k4y3,Tbl,Tbl_old,SL_delta);
 
+}
+
+double RegKMSphere::calTb0(double update_t, double update_radius,double update_vradius, double update_Tb0, double update_delta)
+{
+  //double temp=(powint((th_k1*update_radius)/(th_B*update_delta) + 1.0,2) + (2.0*th_A*(update_Tb0 + (th_A*powint(th_Tb0,2))/(2.0*th_B) + (th_Tinfty*th_k1*update_radius)/(th_B*update_delta)))/th_B);
+  //return (th_Tinfty*th_k1*powint(update_radius,2)*(6.0*th_mygamma - 6.0)*(th_Tinfty + (th_B*((th_k1*update_radius)/(th_B*update_delta) + 1.0))/th_A - (th_B*sqrt(temp))/th_A))/(th_NBC*Pinfty*powint(th_initialR,3)*update_delta) - (update_vradius*update_Tb0*(3.0*th_mygamma - 3.0))/update_radius;
+  return (th_Tinfty*th_k1*powint(update_radius,2)*(6.0*th_mygamma - 6.0)*(th_Tinfty + (th_B*((th_k1*update_radius)/(th_B*update_delta) + 1.0))/th_A - (th_B*sqrt(powint(((th_k1*update_radius)/(th_B*update_delta) + 1.0),2) + (2.0*th_A*(update_Tb0 + (th_A*powint(update_Tb0,2))/(2.0*th_B) + (th_Tinfty*th_k1*update_radius)/(th_B*update_delta)))/th_B))/th_A))/(th_NBC*th_Pinfty*powint(th_initialR,3)*update_delta) - (update_vradius*update_Tb0*(3.0*th_mygamma - 3.0))/update_radius;
+}
+
+double RegKMSphere::calaR(double update_t, double update_radius,double update_vradius, double update_aradius,double update_Tb0, double update_delta, double update_dTb0)
+{
+  //return (CB*rho*((3.0*powint(update_vradius,2)*(update_radius/(3.0*CB) - 1.0))/2.0 - ((update_radius/CB + 1.0)*(th_Pinfty - PA*sin(w*(update_t + update_radius/CB)) + (2.0*sigma)/update_radius + (4.0*update_vradius*miu)/update_radius + update_aradius*update_radius*(th_a/(4.0*powint(update_radius,3)) + th_c/(2.0*powint(update_radius,3))) - (th_NBC*th_Pinfty*powint(th_initialR,3)*update_Tb0)/(th_Tinfty*powint(update_radius,3))) - (update_radius*((2.0*update_vradius*sigma)/powint(update_radius,2) - (4.0*update_aradius*miu)/update_radius - update_vradius*update_aradius*(th_a/(4.0*powint(update_radius,3)) + th_c/(2.0*powint(update_radius,3))) + update_aradius*update_radius*((3.0*th_a*update_vradius)/(4.0*powint(update_radius,4)) + (3.0*th_c*update_vradius)/(2.0*powint(update_radius,4))) + (4.0*powint(update_vradius,2)*miu)/powint(update_radius,2) + PA*w*cos(w*(update_t + update_radius/CB))*(update_vradius/CB + 1.0) + (th_NBC*Pinfty*powint(th_initialR,3)*update_dTb0)/(th_Tinfty*powint(update_radius,3)) - (3.0*th_NBC*Pinfty*update_vradius*powint(th_initialR,3)*update_Tb0)/(th_Tinfty*powint(update_radius,4))))/CB)/rho + update_aradius*update_radius*(update_vradius/CB - 1.0)))/(powint(update_radius,2)*(th_a/(4.0*powint(update_radius,3)) + th_c/(2.0*powint(update_radius,3))));
+  return (CB*rho*((3.0*powint(update_vradius,2)*(update_vradius/(3.0*CB) - 1.0))/2.0 - ((update_vradius/CB + 1.0)*(th_Pinfty - PA*sin(w*(update_t + update_radius/CB)) + (2.0*sigma)/update_radius + (4.0*update_vradius*miu)/update_radius + update_aradius*update_radius*(th_a/(4.0*powint(update_radius,3)) + th_c/(2.0*powint(update_radius,3))) - (th_NBC*th_Pinfty*powint(th_initialR,3)*update_Tb0)/(th_Tinfty*powint(update_radius,3))) - (update_radius*((2.0*update_vradius*sigma)/powint(update_radius,2) - (4.0*update_aradius*miu)/update_radius - update_vradius*update_aradius*(th_a/(4.0*powint(update_radius,3)) + th_c/(2.0*powint(update_radius,3))) + update_aradius*update_radius*((3.0*th_a*update_vradius)/(4.0*powint(update_radius,4)) + (3.0*th_c*update_vradius)/(2.0*powint(update_radius,4))) + (4.0*powint(update_vradius,2)*miu)/powint(update_radius,2) + PA*w*cos(w*(update_t + update_radius/CB))*(update_vradius/CB + 1.0) + (th_NBC*th_Pinfty*powint(th_initialR,3)*update_dTb0)/(th_Tinfty*powint(update_radius,3)) - (3.0*th_NBC*th_Pinfty*update_vradius*powint(th_initialR,3)*update_Tb0)/(th_Tinfty*powint(update_radius,4))))/CB)/rho + update_aradius*update_radius*(update_vradius/CB - 1.0)))/(powint(update_radius,2)*(th_a/(4.0*powint(update_radius,3)) + th_c/(2.0*powint(update_radius,3))));
+}
+
+double RegKMSphere::caldelta(double update_t, double update_radius,double update_vradius,double update_aradius, double update_Tb0, double update_delta,double update_dTb0, double update_eta, double update_Tbll)
+{
+ return -(update_vradius*((2.0*update_delta)/update_radius + powint(update_delta,2)/(2.0*powint(update_radius,2))) - (6.0*alpha1)/update_delta + (update_delta*((update_vradius*th_k1)/(th_A*update_delta) - (th_B*((2.0*th_A*(update_dTb0 + (th_A*update_dTb0*update_Tb0)/th_B + (th_Tinfty*update_vradius*th_k1)/(th_B*update_delta)))/th_B + (2.0*update_vradius*th_k1*((th_k1*update_radius)/(th_B*update_delta) + 1.0))/(th_B*update_delta)))/(2.0*th_A*sqrt(powint(((th_k1*update_radius)/(th_B*update_delta) + 1.0),2) + (2.0*th_A*(update_Tb0 + (th_A*powint(update_Tb0,2))/(2.0*th_B) + (th_Tinfty*th_k1*update_radius)/(th_B*update_delta)))/th_B)))*(update_delta/(2.0*update_radius) + powint(update_delta,2)/(10.0*powint(update_radius,2)) + 1.0))/(th_Tinfty + (th_B*((th_k1*update_radius)/(th_B*update_delta) + 1.0))/th_A - (th_B*sqrt(powint((th_k1*update_radius)/(th_B*update_delta) + 1.0,2) + (2.0*th_A*(update_Tb0 + (th_A*powint(update_Tb0,2))/(2.0*th_B) + (th_Tinfty*th_k1*update_radius)/(th_B*update_delta)))/th_B))/th_A))/(update_delta/update_radius + (3.0*powint(update_delta,2))/(10.0*powint(update_radius,2)) + (update_delta*((th_B*((2.0*th_k1*update_radius*((th_k1*update_radius)/(th_B*update_delta) + 1.0))/(th_B*powint(update_delta,2)) + (2.0*th_A*th_Tinfty*th_k1*update_radius)/(powint(th_B,2)*powint(update_delta,2))))/(2.0*th_A*sqrt(powint((th_k1*update_radius)/(th_B*update_delta) + 1.0,2) + (2.0*th_A*(update_Tb0 + (th_A*powint(update_Tb0,2))/(2.0*th_B) + (th_Tinfty*th_k1*update_radius)/(th_B*update_delta)))/th_B)) - (th_k1*update_radius)/(th_A*powint(update_delta,2)))*(update_delta/(2.0*update_radius) + powint(update_delta,2)/(10.0*powint(update_radius,2)) + 1.0))/(th_Tinfty + (th_B*((th_k1*update_radius)/(th_B*update_delta) + 1.0))/th_A - (th_B*sqrt(powint((th_k1*update_radius)/(th_B*update_delta) + 1.0,2) + (2.0*th_A*(update_Tb0 + (th_A*powint(update_Tb0,2))/(2.0*th_B) + (th_Tinfty*th_k1*update_radius)/(th_B*update_delta)))/th_B))/th_A) + 1.0);
+}
+
+void RegKMSphere::theroy_SLRK4()
+{
+  double h=(update->dt*1e-15/force->femtosecond);
+  //double current_t=(tstart+update->ntimestep*update->dt)*1e-15/force->femtosecond;
+  double update_eta=0.0;
+  double update_Tbll=0.0;
+  
+  double k1y0=th_radius;
+  double k1y1=th_vradius;
+  double k1y2=th_aradius;
+  double k1y4=calTb0(update_t,th_radius,th_vradius,th_Tb0,th_delta);
+  double k1y3=calaR(update_t,th_radius,th_vradius,th_aradius,th_Tb0,th_delta,k1y4);
+  update_eta=(th_radius/th_delta)*(th_k1/th_B);
+  update_Tbll = -th_B/th_A*(1.0 + update_eta) + th_B/th_A*sqrt(powint((1.0 + update_eta),2) + 2.0*th_A/th_B*(th_Tb0 + th_A/(2.0*th_B)*powint(th_Tb0,2) + update_eta*th_Tinfty));
+  double k1y5=caldelta(update_t,th_radius,th_vradius,th_aradius,th_Tb0,th_delta,k1y4,update_eta,update_Tbll);
+  
+  double k2y0=th_radius+h/2.0*k1y1;
+  double k2y1=th_vradius+h/2.0*k1y2;
+  double k2y2=th_aradius+h/2.0*k1y3;
+  double k2y4=calTb0(update_t+h/2.0,k2y0,k2y1,th_Tb0+h/2.0*k1y4,th_delta+h/2.0*k1y5);
+  double k2y3=calaR(update_t+h/2.0,k2y0,k2y1,k2y2,th_Tb0+h/2.0*k1y4,th_delta+h/2.0*k1y5,k2y4);
+  update_eta=(k2y0/(th_delta+h/2.0*k1y5))*(th_k1/th_B);
+  update_Tbll = -th_B/th_A*(1.0 + update_eta) + th_B/th_A*sqrt(powint((1.0 + update_eta),2) + 2.0*th_A/th_B*(th_Tb0+h/2.0*k1y4 + th_A/(2.0*th_B)*powint(th_Tb0+h/2.0*k1y4,2) + update_eta*th_Tinfty));
+  double k2y5=caldelta(update_t+h/2.0,k2y0,k2y1,k2y2,th_Tb0+h/2.0*k1y4,th_delta+h/2.0*k1y5,k2y4,update_eta,update_Tbll);
+
+  double k3y0=th_radius+h/2.0*k2y1;
+  double k3y1=th_vradius+h/2.0*k2y2;
+  double k3y2=th_aradius+h/2.0*k2y3;
+  double k3y4=calTb0(update_t+h/2.0,k3y0,k3y1,th_Tb0+h/2.0*k2y4,th_delta+h/2.0*k2y5);
+  double k3y3=calaR(update_t+h/2.0,k3y0,k3y1,k3y2,th_Tb0+h/2.0*k2y4,th_delta+h/2.0*k2y5,k3y4);
+  update_eta=(k3y0/(th_delta+h/2.0*k2y5))*(th_k1/th_B);
+  update_Tbll = -th_B/th_A*(1.0 + update_eta) + th_B/th_A*sqrt(powint((1.0 + update_eta),2) + 2.0*th_A/th_B*(th_Tb0+h/2.0*k2y4 + th_A/(2.0*th_B)*powint(th_Tb0+h/2.0*k2y4,2) + update_eta*th_Tinfty));
+  double k3y5=caldelta(update_t+h/2.0,k3y0,k3y1,k3y2,th_Tb0+h/2.0*k2y4,th_delta+h/2.0*k2y5,k3y4,update_eta,update_Tbll);
+
+  double k4y0=th_radius+h*k3y1;
+  double k4y1=th_vradius+h*k3y2;
+  double k4y2=th_aradius+h*k3y3;
+  double k4y4=calTb0(update_t+h,k4y0,k4y1,th_Tb0+h*k3y4,th_delta+h*k3y5);
+  double k4y3=calaR(update_t+h,k4y0,k4y1,k4y2,th_Tb0+h*k3y4,th_delta+h*k3y5,k4y4);
+  update_eta=(k4y0/(th_delta+h*k3y5))*(th_k1/th_B);
+  update_Tbll = -th_B/th_A*(1.0 + update_eta) + th_B/th_A*sqrt(powint((1.0 + update_eta),2) + 2.0*th_A/th_B*(th_Tb0+h*k3y4 + th_A/(2.0*th_B)*powint(th_Tb0+h*k3y4,2) + update_eta*th_Tinfty));
+  double k4y5=caldelta(update_t+h,k4y0,k4y1,k4y2,th_Tb0+h*k3y4,th_delta+h*k3y5,k4y4,update_eta,update_Tbll);
+
+  update_t+=h;
+  th_radius+=h/6.0*(k1y1+2.0*k2y1+2.0*k3y1+k4y1);
+  th_vradius+=h/6.0*(k1y2+2.0*k2y2+2.0*k3y2+k4y2);
+  th_aradius+=h/6.0*(k1y3+2.0*k2y3+2.0*k3y3+k4y3);
+  th_Tb0+=h/6.0*(k1y4+2.0*k2y4+2.0*k3y4+k4y4);
+  th_delta+=h/6.0*(k1y5+2.0*k2y5+2.0*k3y5+k4y5);
+
+  SL_debug=th_radius*1e10;
+
+  //if(update->ntimestep%1==0)
+    //utils::logmesg(lmp,"In step {}, k1y3 is {}, k2y3 is {}, k3y3 is {}, k4y3 is {} \n",update->ntimestep,k1y3,k2y3,k3y3,k4y3);
+
+  //calaR ?
 }

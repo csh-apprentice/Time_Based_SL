@@ -61,13 +61,32 @@ class RegKMSphere : public Region {
   double scalefactor;  //scale the temperature
   double Tinfty; // standard pressure
   double alpha1;  // thermal diffusivity of liquid
-  
+  double simulate_time; // total simulation time 
 
   int deltastyle,deltavar;
   char *deltastr;
 
+  // theroy variables
+  double th_radius;
+  double th_vradius;
+  double th_aradius;
+  double th_Tb0;
+  double th_delta;
+  double update_t;
 
+  double th_Tinfty;
+  double th_k1;
+  double th_mygamma;
+  double th_A;
+  double th_B;
+  double th_initialR;
+  double th_NBC;
+  double th_Pinfty;
+  double th_initialrhog;
+  double th_a;
+  double th_c;
   
+
   //double 
   void variable_check();
   void delta_update();
@@ -78,6 +97,12 @@ class RegKMSphere : public Region {
   double calf3(double update_t, double update_radius, double update_vradius, double delta, double Tbl, double Tbl_old);
 
   void SLRK4_debug(double pressure, double pressure_old, double Tbl, double Tbl_old);  // don't change the varaible
+  void theroy_SLRK4();  // update the theroy RK4 in each step
+
+  double calTb0(double update_t,double update_radius,double update_vradius, double update_Tb0, double update_delta);
+  double calaR(double update_t,double update_radius,double update_vradius,double update_aradius, double update_Tb0, double update_delta, double update_dTb0);
+  double caldelta(double update_t,double update_radius,double update_vradius,double update_aradius, double update_Tb0, double update_delta, double update_dTb0, double update_eta, double update_Tbll);
+
 };
 
 }    // namespace LAMMPS_NS

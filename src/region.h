@@ -81,6 +81,7 @@ class Region : protected Pointers {
   double SL_deltaold;  // last frame thickness of the liquid shell
   double SL_vdelta; // velocity of delta
   double SL_debug;  // a debug variable that you can use for variables output
+  double SL_steps;  // accumulated steps in SL simulation
 
   int lost_partilces;  // number of lost particles in the simulation
 
