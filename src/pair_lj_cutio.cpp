@@ -173,8 +173,8 @@ void PairLJCutIO::compute(int eflag, int vflag)
           io_next=(tempi==i)?i_ionext:j_ionext;
 
           //loop i
-          //kinenergy_res=2.0/3.0*(kinenergy_i-io_next*kinenergy_i/kinenergy_sum);
-          kinenergy_res=(kinenergy_i-io_next*kinenergy_i/kinenergy_sum);
+          kinenergy_res=2.0/3.0*(kinenergy_i-io_next*kinenergy_i/kinenergy_sum);
+          //kinenergy_res=(kinenergy_i-io_next*kinenergy_i/kinenergy_sum);
           v_scale=sqrt(kinenergy_res/kinenergy_i);
           v[i][0]*=v_scale;
           v[i][1]*=v_scale;
@@ -182,8 +182,8 @@ void PairLJCutIO::compute(int eflag, int vflag)
           kinenergy_i=kinenergy_res;
 
           //loop j
-          //kinenergy_res=2.0/3.0*(kinenergy_j-io_next*kinenergy_j/kinenergy_sum);
-          kinenergy_res=(kinenergy_j-io_next*kinenergy_j/kinenergy_sum);
+          kinenergy_res=2.0/3.0*(kinenergy_j-io_next*kinenergy_j/kinenergy_sum);
+          //kinenergy_res=(kinenergy_j-io_next*kinenergy_j/kinenergy_sum);
           v_scale=sqrt(kinenergy_res/kinenergy_j);
           v[j][0]*=v_scale;
           v[j][1]*=v_scale;
@@ -203,7 +203,7 @@ void PairLJCutIO::compute(int eflag, int vflag)
           //update the sum of the energy
           kinenergy_sum=kinenergy_i+kinenergy_j;
 
-          //utils::logmesg(lmp,"IODEBUG COMPUTE: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} temp {} energy {}\n",
+          // utils::logmesg(lmp,"IODEBUG COMPUTE: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} temp {} energy {}\n",
           //         update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id,tempi,kinenergy_sum);
         }
         
@@ -265,9 +265,11 @@ void PairLJCutIO::compute(int eflag, int vflag)
           //if(j<nlocal)
           q[j]+=1;
         }
+        
         */
-        //utils::logmesg(lmp,"IODEBUG FINAL: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} \n",
+        // utils::logmesg(lmp,"IODEBUG FINAL: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} \n",
         //           update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id);
+        //utils::logmesg(lmp,"COMPUTE \n");
         if (eflag) {
           evdwl = r6inv * (lj3[itype][jtype] * r6inv - lj4[itype][jtype]) - offset[itype][jtype];
           evdwl *= factor_lj;
@@ -411,6 +413,7 @@ void PairLJCutIO::compute_inner()
 
           q[j]+=1;
         }
+        utils::logmesg(lmp,"COMPUTE INNER \n");
       }
     }
   }
@@ -557,6 +560,7 @@ void PairLJCutIO::compute_middle()
 
           q[j]+=1;
         }
+        utils::logmesg(lmp,"COMPUTE MIDDLE \n");
       }
     }
   }
@@ -698,6 +702,8 @@ void PairLJCutIO::compute_outer(int eflag, int vflag)
 
           q[j]+=1;
         }
+
+        utils::logmesg(lmp,"COMPUTE OUTER \n");
         if (eflag) {
           r2inv = 1.0 / rsq;
           r6inv = r2inv * r2inv * r2inv;
