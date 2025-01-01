@@ -247,8 +247,8 @@ void PairLJCutIOCoulDSF::compute(int eflag, int vflag)
           //update the sum of the energy
           kinenergy_sum=kinenergy_i+kinenergy_j;
 
-          utils::logmesg(lmp,"IODEBUG COMPUTE: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} temp {} energy {}\n",
-                  update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id,tempi,kinenergy_sum);
+          // utils::logmesg(lmp,"IODEBUG COMPUTE: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} temp {} energy {}\n",
+          //         update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id,tempi,kinenergy_sum);
         }
         if (evflag) ev_tally(i,j,nlocal,newton_pair,
                              evdwl,ecoul,fpair,delx,dely,delz);
