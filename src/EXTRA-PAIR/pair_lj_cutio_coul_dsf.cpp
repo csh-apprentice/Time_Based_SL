@@ -286,7 +286,7 @@ void PairLJCutIOCoulDSF::allocate()
   memory->create(offset,n+1,n+1,"pair:offset");
 
   //extension for ionization
-  memory->create(iopo,8,n,n,"pair:iopo");
+  memory->create(iopo,8,n+1,n+1,"pair:iopo");
 }
 
 /* ----------------------------------------------------------------------
@@ -331,7 +331,7 @@ void PairLJCutIOCoulDSF::coeff(int narg, char **arg)
   num_io=utils::numeric(FLERR, arg[2], false, lmp);
 
   //extension for ionization
-  double iopo_eight[8];
+  double iopo_eight[10];
   for(int i=0;i<num_io;i++)
     iopo_eight[i]=utils::numeric(FLERR, arg[3+i], false, lmp);
 
@@ -340,6 +340,8 @@ void PairLJCutIOCoulDSF::coeff(int narg, char **arg)
 
   double cut_lj_one = cut_lj_global;
   if (narg == 6+num_io) cut_lj_one = utils::numeric(FLERR,arg[5+num_io],false,lmp);
+  //utils::logmesg(lmp,"DEBUG: 1 \n");
+         
 
   int count = 0;
   for (int i = ilo; i <= ihi; i++) {
@@ -354,7 +356,7 @@ void PairLJCutIOCoulDSF::coeff(int narg, char **arg)
       count++;
     }
   }
-
+  //utils::logmesg(lmp,"DEBUG: 2 \n");
   if (count == 0) error->all(FLERR,"Incorrect args for pair coefficients");
 }
 
