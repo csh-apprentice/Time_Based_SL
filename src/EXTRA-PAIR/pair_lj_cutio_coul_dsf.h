@@ -39,6 +39,15 @@ class PairLJCutIOCoulDSF : public Pair {
   void read_restart_settings(FILE *) override;
   double single(int, int, int, int, double, double, double, double &) override;
   void *extract(const char *, int &) override;
+  void reset(int* label, double* mindist);
+  void ionization(double** v, double* q, int *label, double* mindist);
+
+  // communication
+  int pack_flag;
+  int pack_forward_comm(int, int *, double *, int, int *) override;
+  void unpack_forward_comm(int, int, double *) override;
+  int pack_reverse_comm(int, int, double *) override;
+  void unpack_reverse_comm(int, int *, double *) override;
 
  protected:
   double cut_lj_global;
