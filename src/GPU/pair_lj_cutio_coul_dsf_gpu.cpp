@@ -25,6 +25,8 @@
 #include "neigh_list.h"
 #include "neighbor.h"
 #include "suffix.h"
+#include "timer.h"
+#include "comm.h"
 
 #include <cmath>
 
@@ -204,6 +206,8 @@ void PairLJCutIOCoulDSFGPU::cpu_compute(int start, int inum, int eflag, int /* v
   double *special_coul = force->special_coul;
   double *special_lj = force->special_lj;
   double qqrd2e = force->qqrd2e;
+  int *label=atom->ivector[1];
+  double *mindist =atom->dvector[0];
 
   //extension for ionization
   double kinenergy_i=0.0,kinenergy_j=0.0,kinenergy_sum=0.0,kinenergy_res=0.0;
@@ -212,6 +216,20 @@ void PairLJCutIOCoulDSFGPU::cpu_compute(int start, int inum, int eflag, int /* v
   int i_res=0,j_res=0;
 
   // loop over neighbors of my atoms
+  ionization(v,q,label,mindist);   // change the q
+  
+  pack_flag = 1;
+  comm->forward_comm(this);
+
+  reset(label,mindist);   // change the label and mindist
+
+  pack_flag = 2;
+  comm->forward_comm(this);
+  labelnext(v,q,label,mindist);  // change the label and mindist
+
+  pack_flag = 3;
+  comm->forward_comm(this);
+  timer->stamp(Timer::IONIZATION);
 
   for (ii = start; ii < inum; ii++) {
     i = ilist[ii];
@@ -276,70 +294,6 @@ void PairLJCutIOCoulDSFGPU::cpu_compute(int start, int inum, int eflag, int /* v
             if (factor_coul < 1.0) ecoul -= (1.0 - factor_coul) * prefactor;
           } else
             ecoul = 0.0;
-        }
-
-                //v[j][1]=1.0;
-        kinenergy_i=1e4*1/2*m[i]*(v[i][0]*v[i][0]+v[i][1]*v[i][1]+v[i][2]*v[i][2]);
-        kinenergy_j=1e4*1/2*m[j]*(v[j][0]*v[j][0]+v[j][1]*v[j][1]+v[j][2]*v[j][2]);
-        kinenergy_sum=kinenergy_i+kinenergy_j;
-
-        i_res=num_io-int(q[i]);
-        j_res=num_io-int(q[j]);
-
-        //output index of each atom
-        i_ionext=(i_res!=0)?iopo[int(q[i])][itype][jtype]:MAXENERGY;
-        j_ionext=(j_res!=0)?iopo[int(q[j])][itype][jtype]:MAXENERGY;
-
-        int i_id=(atom->tag)[i];
-        int j_id=(atom->tag)[j];
-
-        //utils::logmesg(lmp,"IODEBUG START: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} energy {}\n",
-        //           update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id, kinenergy_sum);
-        while((i_res>0&&kinenergy_sum>i_ionext)||(j_res>0&&kinenergy_sum>j_ionext))
-        {
-          int tempi=i;
-          //define cusomized symmetric ionization order here
-          if (fabs(i_ionext-j_ionext)<EPSILON)
-            //if have the same ionization energy, always pick the atom with a smaller global id
-            tempi=(i_id<j_id)?i:j;
-          else if (i_ionext>j_ionext)
-            tempi=j;
-
-          io_next=(tempi==i)?i_ionext:j_ionext;
-
-          //loop i
-          kinenergy_res=2.0/3.0*(kinenergy_i-io_next*kinenergy_i/kinenergy_sum);
-          //kinenergy_res=(kinenergy_i-io_next*kinenergy_i/kinenergy_sum);
-          v_scale=sqrt(kinenergy_res/kinenergy_i);
-          v[i][0]*=v_scale;
-          v[i][1]*=v_scale;
-          v[i][2]*=v_scale; 
-          kinenergy_i=kinenergy_res;
-
-          //loop j
-          kinenergy_res=2.0/3.0*(kinenergy_j-io_next*kinenergy_j/kinenergy_sum);
-          //kinenergy_res=(kinenergy_j-io_next*kinenergy_j/kinenergy_sum);
-          v_scale=sqrt(kinenergy_res/kinenergy_j);
-          v[j][0]*=v_scale;
-          v[j][1]*=v_scale;
-          v[j][2]*=v_scale; 
-          kinenergy_j=kinenergy_res;
-
-          //increament q
-          q[tempi]++;
-          i_res=num_io-int(q[i]);
-          j_res=num_io-int(q[j]);
-          
-
-          //update the io energy
-          i_ionext=(i_res!=0)?iopo[int(q[i])][itype][jtype]:MAXENERGY;
-          j_ionext=(j_res!=0)?iopo[int(q[j])][itype][jtype]:MAXENERGY;
-
-          //update the sum of the energy
-          kinenergy_sum=kinenergy_i+kinenergy_j;
-
-          // utils::logmesg(lmp,"IODEBUG COMPUTE: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {} temp {} energy {}\n",
-          //         update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id,tempi,kinenergy_sum);
         }
 
         if (evflag) ev_tally_full(i, evdwl, ecoul, fpair, delx, dely, delz);

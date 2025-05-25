@@ -41,15 +41,17 @@ class PairLJCutIOCoulDSF : public Pair {
   void *extract(const char *, int &) override;
   void reset(int* label, double* mindist);
   void ionization(double** v, double* q, int *label, double* mindist);
+  void labelnext(double**v, double* q, int * label, double* mindist);
 
   // communication
-  int pack_flag;
+  
   int pack_forward_comm(int, int *, double *, int, int *) override;
   void unpack_forward_comm(int, int, double *) override;
   int pack_reverse_comm(int, int, double *) override;
   void unpack_reverse_comm(int, int *, double *) override;
 
  protected:
+  int pack_flag;
   double cut_lj_global;
   double **cut_lj, **cut_ljsq;
   double **epsilon, **sigma;

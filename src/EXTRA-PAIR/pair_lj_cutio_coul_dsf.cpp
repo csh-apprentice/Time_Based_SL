@@ -28,6 +28,7 @@
 #include "neigh_list.h"
 #include "neighbor.h"
 #include "update.h"
+#include "timer.h"
 
 #include <cmath>
 #include <cstring>
@@ -116,8 +117,6 @@ void PairLJCutIOCoulDSF::compute(int eflag, int vflag)
   numneigh = list->numneigh;
   firstneigh = list->firstneigh;
 
-  double qdebug=0.0;
-
   //extension for ionization
   // pack_flag = 4;
   // comm->forward_comm(this);
@@ -125,7 +124,8 @@ void PairLJCutIOCoulDSF::compute(int eflag, int vflag)
   //if(update->ntimestep==168)
   //before started, print out all atom information
   
-  ionization(v,q,label,mindist);
+  ionization(v,q,label,mindist);   // change the q
+  
   pack_flag = 1;
   comm->forward_comm(this);
   if(newton_pair)
@@ -135,7 +135,7 @@ void PairLJCutIOCoulDSF::compute(int eflag, int vflag)
   }
 
 
-  reset(label,mindist);
+  reset(label,mindist);   // change the label and mindist
 
   pack_flag = 2;
   comm->forward_comm(this);
@@ -144,6 +144,17 @@ void PairLJCutIOCoulDSF::compute(int eflag, int vflag)
     pack_flag=2;
     comm->reverse_comm(this);
   }
+
+  labelnext(v,q,label,mindist);  // change the label and mindist
+
+  pack_flag = 3;
+  comm->forward_comm(this);
+  if(newton_pair)
+  {
+    pack_flag=3;
+    comm->reverse_comm(this);
+  }
+  timer->stamp(Timer::IONIZATION);
   for (ii = 0; ii < inum; ii++) {
       i = ilist[ii];
       qtmp = q[i];
@@ -214,62 +225,15 @@ void PairLJCutIOCoulDSF::compute(int eflag, int vflag)
 
         if (evflag) ev_tally(i,j,nlocal,newton_pair,
                              evdwl,ecoul,fpair,delx,dely,delz);
-
-        if(rsq<cutforce)
-        {
-            // Extension for ionization
-          double kinenergy_i=1e4*1.0/2.0*m[i]*(v[i][0]*v[i][0]+v[i][1]*v[i][1]+v[i][2]*v[i][2]);
-          double i_res=num_io-int(q[i]);
-          double i_ionext=(i_res!=0)?iopo[int(q[i])][itype][jtype]:MAXENERGY;
-          int i_id=(atom->tag)[i];
-
-          int j_id=(atom->tag)[j];
-          double kinenergy_j=1e4*1.0/2.0*m[j]*(v[j][0]*v[j][0]+v[j][1]*v[j][1]+v[j][2]*v[j][2]);
-          int j_res=num_io-int(q[j]);
-          // if(flag && j==jlocal) 
-          // {
-          //   kinenergy_j=jenergyres;
-          //   j_res=num_io-int(jqlocal);
-          // }
-          double j_ionext=(j_res!=0)?iopo[int(q[j])][itype][jtype]:MAXENERGY;
-          double kinenergy_sum=kinenergy_i+kinenergy_j;
-          
-          
-          // mindist[i]=rsq;
-          // mindist[j]=rsq;
-          //MPI_Barrier(MPI_COMM_WORLD);
-          //utils::logmesg(lmp,"Instep {}, Labeli {} is {}, mindisti is {}, Labelj {} is {}, mindistj is {}, cutoff is {} \n",update->ntimestep,i_id,label[i],mindist[i],j_id,label[j],mindist[j],cutsq[itype][jtype]);
-
-          // update the possible ionization events
-          if ((i_res > 0 && kinenergy_sum > i_ionext) || (j_res > 0 && kinenergy_sum > j_ionext)) {
-
-              // Process for `i`
-              if (rsq <= mindist[i] - EPSILON || (rsq <= mindist[i] + EPSILON && label[i]>=j_id))  {
-                  label[i] = j_id;
-                  mindist[i] = rsq;
-              }
-
-              // Process for `j`
-              if (rsq <= mindist[j] - EPSILON || (rsq <= mindist[j] + EPSILON && label[j]>=i_id)) {
-                  label[j] = i_id;
-                  mindist[j] = rsq;
-              }
-          }
-
-        }
-        
       }
+      //  utils::logmesg(lmp,"COMPUTE: step {} qi {} qj {}  tagi {} tagj {}  \n",
+      //             update->ntimestep,q[i],q[j],atom->tag[i],atom->tag[j]);
     } // second j loop
   } //second i loop
+  
   // pack_flag = 4;
   // comm->reverse_comm(this);
-  pack_flag = 3;
-  comm->forward_comm(this);
-  if(newton_pair)
-  {
-    pack_flag=3;
-    comm->reverse_comm(this);
-  }
+
   
     //MPI_Barrier(MPI_COMM_WORLD);
     //utils::logmesg(lmp,"Instep {}, Labeli {} is {}, mindisti is {}, Labelj {} is {}, mindistj is {} \n",update->ntimestep,i_id,label[i],mindist[i],j_id,label[j],mindist[j]); 
@@ -665,10 +629,11 @@ void PairLJCutIOCoulDSF::reset(int *label, double *mindist)
       dely = ytmp - x[j][1];
       delz = ztmp - x[j][2];
       rsq = delx*delx + dely*dely + delz*delz;
+      r=sqrt(rsq);
       jtype = type[j];
       
       //label[j]=-1; mindist[j]=BIG;
-      if (rsq < cutforce) {
+      if (rsq<cutsq[itype][jtype] && r < cutforce) {
         label[i]=-1; mindist[i]=BIG;
         label[j]=-1; mindist[j]=BIG;
       }
@@ -695,6 +660,7 @@ void PairLJCutIOCoulDSF::ionization(double** v, double* q, int *label, double* m
   double *special_coul = force->special_coul;
   int newton_pair = force->newton_pair;
   double qqrd2e = force->qqrd2e; 
+
 
   inum = list->inum;
   ilist = list->ilist;
@@ -726,11 +692,14 @@ void PairLJCutIOCoulDSF::ionization(double** v, double* q, int *label, double* m
       delz = ztmp - x[j][2];
       rsq = delx*delx + dely*dely + delz*delz;
       jtype = type[j];
+
+      r=sqrt(rsq);
       
       //int llabel=label[i];
-      //utils::logmesg(lmp,"In step {}, i_id is {}, j_id is {} \n",update->ntimestep,i_id,j_id);
+      // if(rsq <cutsq[itype][jtype])
+      // utils::logmesg(lmp,"In step {}, i_id is {}, j_id is {} \n",update->ntimestep,i_id,j_id);
 
-      if(rsq <cutforce && label[i]==(atom->tag)[j] && label[j]==(atom->tag)[i]) //label match
+      if(rsq <cutsq[itype][jtype]&& r<cutforce && label[i]==(atom->tag)[j] && label[j]==(atom->tag)[i]) //label match
       {
         // recheck energy
         //double check the energy avoid shifting from last step
@@ -810,6 +779,94 @@ void PairLJCutIOCoulDSF::ionization(double** v, double* q, int *label, double* m
 
     }  //first j loop
   } //first i loop
+}
+
+void PairLJCutIOCoulDSF::labelnext(double**v, double* q, int * label, double* mindist)
+{
+  int i,j,ii,jj,inum,jnum,itype,jtype;
+  double qtmp,xtmp,ytmp,ztmp,delx,dely,delz,evdwl,ecoul,fpair;
+  double r,rsq,r2inv,r6inv,forcecoul,forcelj,factor_coul,factor_lj;
+  double prefactor,erfcc,erfcd,t;
+  int *ilist,*jlist,*numneigh,**firstneigh;
+
+  
+  //utils::logmesg(lmp,"DEBUG 1 \n");
+
+  double **x = atom->x;
+  double *m=atom->rmass;
+  int *type = atom->type;
+  int nlocal = atom->nlocal;
+  double *special_lj = force->special_lj;
+  double *special_coul = force->special_coul;
+  int newton_pair = force->newton_pair;
+  double qqrd2e = force->qqrd2e; 
+
+  inum = list->inum;
+  ilist = list->ilist;
+  numneigh = list->numneigh;
+  firstneigh = list->firstneigh;
+  
+  for (ii = 0; ii < inum; ii++) {
+      i = ilist[ii];
+      qtmp = q[i];
+      xtmp = x[i][0];
+      ytmp = x[i][1];
+      ztmp = x[i][2];
+      itype = type[i];
+      jlist = firstneigh[i];
+      jnum = numneigh[i];
+    for (jj = 0; jj < jnum; jj++) {
+      j = jlist[jj];
+      factor_lj = special_lj[sbmask(j)];
+      factor_coul = special_coul[sbmask(j)];
+      j &= NEIGHMASK;
+
+      delx = xtmp - x[j][0];
+      dely = ytmp - x[j][1];
+      delz = ztmp - x[j][2];
+      rsq = delx*delx + dely*dely + delz*delz;
+      r=sqrt(rsq);
+      jtype = type[j];
+
+      if (rsq < cutsq[itype][jtype]) {
+        
+        if(r<cutforce)
+        {
+            // Extension for ionization
+          double kinenergy_i=1e4*1.0/2.0*m[i]*(v[i][0]*v[i][0]+v[i][1]*v[i][1]+v[i][2]*v[i][2]);
+          double i_res=num_io-int(q[i]);
+          double i_ionext=(i_res!=0)?iopo[int(q[i])][itype][jtype]:MAXENERGY;
+          int i_id=(atom->tag)[i];
+
+          int j_id=(atom->tag)[j];
+          double kinenergy_j=1e4*1.0/2.0*m[j]*(v[j][0]*v[j][0]+v[j][1]*v[j][1]+v[j][2]*v[j][2]);
+          int j_res=num_io-int(q[j]);
+          double j_ionext=(j_res!=0)?iopo[int(q[j])][itype][jtype]:MAXENERGY;
+          double kinenergy_sum=kinenergy_i+kinenergy_j;
+          
+          // update the possible ionization events
+          if ((i_res > 0 && kinenergy_sum > i_ionext) || (j_res > 0 && kinenergy_sum > j_ionext)) {
+              // utils::logmesg(lmp,"Labelnext COMPUTE: step {} qi {} qj {} i_io {} j_io {} tagi {} tagj {}  energy {} cutoff {}\n",
+              //     update->ntimestep,q[i],q[j],i_ionext,j_ionext,i_id,j_id,kinenergy_sum,cutsq[itype][jtype]);
+              // Process for `i`
+              if (rsq <= mindist[i] - EPSILON || (rsq <= mindist[i] + EPSILON && label[i]>=j_id))  {
+                  label[i] = j_id;
+                  mindist[i] = rsq;
+              }
+
+              // Process for `j`
+              if (rsq <= mindist[j] - EPSILON || (rsq <= mindist[j] + EPSILON && label[j]>=i_id)) {
+                  label[j] = i_id;
+                  mindist[j] = rsq;
+              }
+          }
+
+        }
+        
+      }
+    } // second j loop
+  } //second i loop
+
 }
 
 /* ---------------------------------------------------------------------- */
