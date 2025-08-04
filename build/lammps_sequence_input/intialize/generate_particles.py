@@ -126,7 +126,7 @@ def generate_batch_grid(seed_offset, args, target, R_in):
 # ----------------------------
 # LAMMPS saving format
 # ----------------------------
-def save_lammps_data_format(filename, positions, velocities, masses, timestep=1000, atom_type=1, mol_id=0):
+def save_lammps_data_format(filename, positions, velocities, masses, timestep=0, atom_type=1, mol_id=0):
     N = positions.shape[0]
     assert positions.shape == velocities.shape == (N, 3)
 
