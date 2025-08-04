@@ -44,6 +44,7 @@ class FixWallMDHeatbath : public Fix {
   double alpha;
 
   double vwall;   // the bubble wall velocity 
+  double Tblgasinit;  // intial gas shell temperature
   double Tbl;     // the wall temperature
   double Tblold;   // the wall temperature of last frame
   double mix_coeff;  // weight parameter of heat bath condition and adiabatic condition, 1 refers to hb, 0 refers to adiabatic

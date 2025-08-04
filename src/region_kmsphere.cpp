@@ -36,7 +36,7 @@ enum { CONSTANT,VARIABLE, AUTO, MIXING };
 RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
     Region(lmp, narg, arg), deltastr(nullptr)
 {
-  options(narg - 21, &arg[21]);
+  options(narg - 27, &arg[27]);
   xc = xscale * utils::numeric(FLERR, arg[2], false, lmp);
   yc = yscale * utils::numeric(FLERR, arg[3], false, lmp);
   zc = zscale * utils::numeric(FLERR, arg[4], false, lmp);
@@ -57,6 +57,15 @@ RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
   Tinfty=utils::numeric(FLERR, arg[17], false, lmp)*scalefactor;
   alpha1=utils::numeric(FLERR, arg[18], false, lmp);
   SL_vdelta=utils::numeric(FLERR, arg[19], false, lmp);
+
+  th_radius=utils::numeric(FLERR, arg[21], false, lmp);
+  th_vradius=utils::numeric(FLERR, arg[22], false, lmp);
+  th_aradius=utils::numeric(FLERR, arg[23], false, lmp);
+  th_Tb0=utils::numeric(FLERR, arg[24], false, lmp);
+  th_delta=utils::numeric(FLERR, arg[25], false, lmp);
+
+  simulate_time=utils::numeric(FLERR, arg[26], false, lmp);
+
   // delta variable checking
   if (utils::strmatch(arg[20], "^v_")) {
     deltastr = utils::strdup(arg[20] + 2);
@@ -78,7 +87,7 @@ RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
       SL_deltaold=SL_delta;
       deltastyle=AUTO;
     }
-    utils::logmesg(lmp,"REGION KMSPHERE. deltasytle is {} \n",deltastyle);
+    //utils::logmesg(lmp,"REGION KMSPHERE. deltasytle is {} \n",deltastyle);
 
   varshape=1; // enable the shape_update()
   if (varshape)
@@ -112,7 +121,7 @@ RegKMSphere::RegKMSphere(LAMMPS *lmp, int narg, char **arg) :
   contact = new Contact[cmax];
   tmax = 1;
 
-  utils::logmesg(lmp,"REGION KMSPHERE, Initial radius is {}\n",radius);
+  //utils::logmesg(lmp,"REGION KMSPHERE, Initial radius is {}\n",radius);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -136,15 +145,15 @@ void RegKMSphere::init()
   pressure_old=0.0;
   stepnum=0;
   sumdiffTbl=0.0;
-  simulate_time=0.0;
-  SL_steps=0.0;
+  //simulate_time=0.0;
+  SL_steps=simulate_time*1e15;
 
   // Theoty initialization
-  th_radius=3.086969205287614e-06;
-  th_vradius=-3.162987025445613e+02;
-  th_aradius=-4.094560456322810e+10;
-  th_Tb0=2.530107262855020e+03;
-  th_delta=2.520848698181851e-07;
+  // th_radius=3.086969205287614e-06;
+  // th_vradius=-3.162987025445613e+02;
+  // th_aradius=-4.094560456322810e+10;
+  // th_Tb0=2.530107262855020e+03;
+  // th_delta=2.520848698181851e-07;
   update_t=tstart;
 
   th_Tinfty=300.0;
@@ -255,7 +264,8 @@ void RegKMSphere::shape_update()
   // invoke the RK4 update and log down the old pressure
   SL_lastradius=radius;
 
-  if (update->ntimestep>0)
+  // These can ensure the consistency in restart but may cause two steps latency
+  if (abs(pb-0.0)>1e-6 && abs(pressure_old)>1e-6)
   {
       //update the delta and radius
     switch (deltastyle) {
@@ -268,8 +278,8 @@ void RegKMSphere::shape_update()
 
     case AUTO:
       delta_update();
-      SLRK4(pressure, pressure_old);
       theroy_SLRK4();
+      SLRK4(pressure, pressure_old);      
       break;
 
     case MIXING:
@@ -299,13 +309,87 @@ void RegKMSphere::shape_update()
     }
 
   }
+  // else  // fix twp steps latency
+  // {
+  //   delta_update();
+  //   theroy_SLRK4();
+  //   double h=(update->dt*1e-15/force->femtosecond);
+  //   // we use the old velocity to update
+  //   radius-=vradius*(update->dt/force->femtosecond);
+  //   simulate_time+=h;
+  //   SL_steps+=update->dt;
+  // }
   
   // log down the old pressure
-  pressure_old=pressure;
+  if(abs(pb-0.0)>1e-6) pressure_old=pressure;
   SL_radius=radius;
   SL_vradius=vradius;
 
 }
+
+// void RegKMSphere::shape_update()
+// {
+//   //radius=radius+vradius*update->dt;
+//   radius_in=radius-cutoff;
+//   volume=4.0*MY_PI/3.0*(radius*radius*radius-radius_in*radius_in*radius_in);
+//   pressure=-stress/(3.0*volume)*101325;
+//   pb=pressure;
+//   pressure-=2*sigma/(radius*1e-10)+4.0*miu*(vradius*1e5)/(radius*1e-10);
+
+//   // invoke the RK4 update and log down the old pressure
+//   SL_lastradius=radius;
+
+//   if (update->ntimestep>0)
+//   {
+//       //update the delta and radius
+//     switch (deltastyle) {
+//     case VARIABLE:
+//       delta_update();
+//       SLRK4(pressure, pressure_old);
+//       // SLRK4_debug(pressure, pressure_old, SL_Tblliquid, SL_Tblliquidold);
+//       theroy_SLRK4();
+//       break;
+
+//     case AUTO:
+//       delta_update();
+//       SLRK4(pressure, pressure_old);
+//       theroy_SLRK4();
+//       break;
+
+//     case MIXING:
+//       if (update->ntimestep < 1000) {
+//         delta_update();
+//         SLRK4(pressure, pressure_old);
+//       } else {
+//         SL_deltaold = SL_delta;
+//         SL_delta = SL_delta + SL_vdelta * update->dt;
+
+//         if (stepnum >= 2) {
+//           double avgTbl = SL_Tblliquid;
+//           double avfdiffTbl = sumdiffTbl / double(stepnum);
+//           double avgTblold = avgTbl - avfdiffTbl;
+//           SLRK4(pressure, pressure_old, avgTbl, avgTblold);
+//           // utils::logmesg(lmp, "REGION KMSPHERE, In step {}, avgTbl is {}, avgTblold is {}\n", update->ntimestep, avgTbl, avgTblold);
+//           stepnum = 0;  // reset the stepnum
+//           sumdiffTbl = 0.0;  // reset the sum of diffTbl
+//         }
+//         // SL_delta = SL_delta + SL_vdelta * update->dt;
+//       }
+//       break;
+
+//     default:
+//       // Handle unexpected deltastyle values if necessary
+//       break;
+//     }
+
+//   }
+  
+//   // log down the old pressure
+//   pressure_old=pressure;
+//   SL_radius=radius;
+//   SL_vradius=vradius;
+
+// }
 
 /* ----------------------------------------------------------------------
    error check on existence of variable
@@ -482,6 +566,7 @@ void RegKMSphere::delta_update()
      // In Auto Mode, delta is borrowed from the thery_SLRK4()
      SL_deltaold=SL_delta;
      SL_delta=th_delta*1e10;
+     SL_vdelta=(SL_delta-SL_deltaold)/update->dt;
      //if(update->ntimestep%1==0)
       //utils::logmesg(lmp,"In step {}, Current delta is {} \n",update->ntimestep,SL_delta);
 

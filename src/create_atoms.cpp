@@ -964,6 +964,14 @@ void CreateAtoms::add_ununiform()
   int ninsert = 0;
   double r=0.0; //radius for the current particle
 
+  // debug info
+  int total_attempts = 0;
+  int pdf_rejects = 0;
+  int region_rejects = 0;
+  int overlap_rejects = 0;
+  int successful_overlap_checks = 0;
+
+
   for (int i = 0; i < nununiform; i++) {
 
     // attempt to insert an atom/molecule up to maxtry times
@@ -971,6 +979,7 @@ void CreateAtoms::add_ununiform()
 
     success = 0;
     ntry = 0;
+    total_attempts++;
 
     while (ntry < maxtry) {
       ntry++;
@@ -979,7 +988,10 @@ void CreateAtoms::add_ununiform()
       double xtest=xlist[index]+random->uniform()*(1-xlist[index]);
       double ytest=ylist[index]+random->uniform()*(ylist[index+1]-ylist[index]);
       if (xtest>xlist[index+1] || ytest>xa*pow(xtest,4)+xb*pow(xtest,2))
-          r=xtest;
+      {
+        pdf_rejects++;
+        r=xtest;
+      }
       else 
         continue;  // if not obey the Ziggurat, just move to the next particle
         
@@ -994,8 +1006,8 @@ void CreateAtoms::add_ununiform()
       xone[2] = z*r*Rb;
       if (domain->dimension == 2) xone[2] = zmid;
 
-      if (region && (region->match(xone[0], xone[1], xone[2]) == 0)) continue;
-      if (varflag && vartest(xone) == 0) continue;
+      if (region && (region->match(xone[0], xone[1], xone[2]) == 0)) {region_rejects++; continue;}
+      if (varflag && vartest(xone) == 0) {region_rejects++; continue;}
 
       if (triclinic) {
         domain->x2lamda(xone, lamda);
@@ -1026,6 +1038,7 @@ void CreateAtoms::add_ununiform()
           distsq = delx * delx + dely * dely + delz * delz;
           if (distsq < odistsq) {
             reject = 1;
+            successful_overlap_checks += nlocal;
             break;
           }
         }
@@ -1059,6 +1072,27 @@ void CreateAtoms::add_ununiform()
       }
     }
   }
+
+  //debug
+  long long counters[6] = {total_attempts, pdf_rejects, region_rejects, overlap_rejects, successful_overlap_checks, ninsert};
+  long long global[6];
+
+  MPI_Reduce(counters, global, 6, MPI_LONG_LONG, MPI_SUM, 0, world);
+  if (comm->me == 0) {
+  char msg[512];
+  snprintf(msg, sizeof(msg),
+           "Create atoms: DEBUG STATS:\n"
+           "  Total attempts:           %lld\n"
+           "  PDF rejections:           %lld\n"
+           "  Region/var rejections:    %lld\n"
+           "  Overlap rejections:       %lld\n"
+           "  Overlap checks performed: %lld\n"
+           "  Successful insertions:    %lld\n",
+           global[0], global[1], global[2], global[3], global[4], global[5]);
+  utils::logmesg(lmp, msg);
+  }
+
+
 
   // warn if did not successfully insert Nrandom atoms/molecules
 

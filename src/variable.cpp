@@ -3897,7 +3897,10 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
       strcmp(word,"slwalltemp") != 0 && strcmp(word,"sldelta") &&
       strcmp(word,"slvdelta") && strcmp(word,"slnumatoms")!=0 && 
       strcmp(word,"sldebug")!=0 && strcmp(word,"slpb") != 0 &&
-      strcmp(word,"lostparticles")!=0 && strcmp(word,"slsteps")!=0)
+      strcmp(word,"lostparticles")!=0 && strcmp(word,"slsteps")!=0 &&
+      strcmp(word,"thradius")!=0 && strcmp(word,"thvradius")!=0 &&
+      strcmp(word,"tharadius")!=0 && strcmp(word,"thTb0")!=0 &&
+      strcmp(word,"thdelta")!=0)
     return 0;
 
   // parse contents for comma-separated args
@@ -4128,7 +4131,22 @@ int Variable::group_function(char *word, char *contents, Tree **tree, Tree **tre
   } else if (strcmp(word,"slsteps") == 0) {
     if (narg == 2) value = group->SL_steps(igroup,slregion_function(args[1],ivar));
     else print_var_error(FLERR,group_errmesg,ivar);
-  } 
+  } else if (strcmp(word,"thradius") == 0) {
+    if (narg == 2) value = group->TH_radius(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"thvradius") == 0) {
+    if (narg == 2) value = group->TH_vradius(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"tharadius") == 0) {
+    if (narg == 2) value = group->TH_aradius(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"thTb0") == 0) {
+    if (narg == 2) value = group->TH_Tb0(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  } else if (strcmp(word,"thdelta") == 0) {
+    if (narg == 2) value = group->TH_delta(igroup,slregion_function(args[1],ivar));
+    else print_var_error(FLERR,group_errmesg,ivar);
+  }
 
   // delete stored args
 

@@ -1878,6 +1878,55 @@ double Group::SL_steps(int igroup, Region *region)
 }
 
 /* ----------------------------------------------------------------------
+   SL mode, return the theory radius
+------------------------------------------------------------------------- */
+
+double Group::TH_radius(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->th_radius;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the theory vradius
+------------------------------------------------------------------------- */
+
+double Group::TH_vradius(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->th_vradius;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the theory aradius
+------------------------------------------------------------------------- */
+
+double Group::TH_aradius(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->th_aradius;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the theory wall temperature
+------------------------------------------------------------------------- */
+
+double Group::TH_Tb0(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->th_Tb0;
+}
+
+/* ----------------------------------------------------------------------
+   SL mode, return the theory wall thickness
+------------------------------------------------------------------------- */
+
+double Group::TH_delta(int igroup, Region *region)
+{
+  //region->prematch();
+  return region->th_delta;
+}
+/* ----------------------------------------------------------------------
    SL mode, return the debug variable
 ------------------------------------------------------------------------- */
 

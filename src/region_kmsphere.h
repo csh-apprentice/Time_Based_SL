@@ -67,11 +67,11 @@ class RegKMSphere : public Region {
   char *deltastr;
 
   // theroy variables
-  double th_radius;
-  double th_vradius;
-  double th_aradius;
-  double th_Tb0;
-  double th_delta;
+//   double th_radius;
+//   double th_vradius;
+//   double th_aradius;
+//   double th_Tb0;
+//   double th_delta;
   double update_t;
 
   double th_Tinfty;

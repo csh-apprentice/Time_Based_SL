@@ -12,7 +12,7 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include "reader_native.h"
+#include "reader_slnative.h"
 
 #include "error.h"
 #include "memory.h"
@@ -33,7 +33,7 @@ enum{UNSET,NOSCALE_NOWRAP,NOSCALE_WRAP,SCALE_NOWRAP,SCALE_WRAP};
 
 /* ---------------------------------------------------------------------- */
 
-ReaderNative::ReaderNative(LAMMPS *lmp) : Reader(lmp)
+ReaderSLNative::ReaderSLNative(LAMMPS *lmp) : Reader(lmp)
 {
   line = new char[MAXLINE];
   fieldindex = nullptr;
@@ -43,7 +43,7 @@ ReaderNative::ReaderNative(LAMMPS *lmp) : Reader(lmp)
 
 /* ---------------------------------------------------------------------- */
 
-ReaderNative::~ReaderNative()
+ReaderSLNative::~ReaderSLNative()
 {
   delete[] line;
   memory->destroy(fieldindex);
@@ -56,7 +56,7 @@ ReaderNative::~ReaderNative()
    only called by proc 0
 ------------------------------------------------------------------------- */
 
-int ReaderNative::read_time(bigint &ntimestep)
+int ReaderSLNative::read_time(bigint &ntimestep)
 {
   if (binary) {
     int endian = 0x0001;
@@ -112,7 +112,7 @@ int ReaderNative::read_time(bigint &ntimestep)
    only called by proc 0
 ------------------------------------------------------------------------- */
 
-void ReaderNative::skip()
+void ReaderSLNative::skip()
 {
   if (binary) {
     int triclinic;
@@ -153,7 +153,7 @@ void ReaderNative::skip()
   }
 }
 
-void ReaderNative::skip_reading_magic_str()
+void ReaderSLNative::skip_reading_magic_str()
 {
   if (is_known_magic_str() && revision > 0x0001) {
     int len;
@@ -188,7 +188,7 @@ void ReaderNative::skip_reading_magic_str()
    only called by proc 0
 ------------------------------------------------------------------------- */
 
-bigint ReaderNative::read_header(double box[3][3], int &boxinfo, int &triclinic,
+bigint ReaderSLNative::read_header(double box[3][3], int &boxinfo, int &triclinic,
                                  int fieldinfo, int nfield,
                                  int *fieldtype, char **fieldlabel,
                                  int scaleflag, int wrapflag, int &fieldflag,
@@ -429,7 +429,7 @@ bigint ReaderNative::read_header(double box[3][3], int &boxinfo, int &triclinic,
     else if (fieldtype[i] == I2LABEL)
       fieldindex[i] = find_label("i2_label", labels);
     else if (fieldtype[i] == DMINDIST)
-      fieldindex[i] = find_label("d_mindist", labels);  
+      fieldindex[i] = find_label("d_mindist", labels);      
   }
 
   // set fieldflag = -1 if any unfound fields
@@ -448,7 +448,7 @@ bigint ReaderNative::read_header(double box[3][3], int &boxinfo, int &triclinic,
    only called by proc 0
 ------------------------------------------------------------------------- */
 
-void ReaderNative::read_atoms(int n, int nfield, double **fields)
+void ReaderSLNative::read_atoms(int n, int nfield, double **fields)
 {
   if (binary) {
     if (feof(fp)) {
@@ -505,7 +505,7 @@ void ReaderNative::read_atoms(int n, int nfield, double **fields)
    return index of match or -1 if no match
 ------------------------------------------------------------------------- */
 
-int ReaderNative::find_label(const std::string &label, const std::map<std::string, int> & labels)
+int ReaderSLNative::find_label(const std::string &label, const std::map<std::string, int> & labels)
 {
   auto it = labels.find(label);
   if (it != labels.end()) {
@@ -520,26 +520,26 @@ int ReaderNative::find_label(const std::string &label, const std::map<std::strin
    only called by proc 0
 ------------------------------------------------------------------------- */
 
-void ReaderNative::read_lines(int n)
+void ReaderSLNative::read_lines(int n)
 {
   for (int i = 0; i < n; i++) {
     utils::sfgets(FLERR, line, MAXLINE, fp, nullptr, error);
   }
 }
 
-void ReaderNative::read_buf(void * ptr, size_t size, size_t count)
+void ReaderSLNative::read_buf(void * ptr, size_t size, size_t count)
 {
   utils::sfread(FLERR, ptr, size, count, fp, nullptr, error);
 }
 
-std::string ReaderNative::read_binary_str(size_t size)
+std::string ReaderSLNative::read_binary_str(size_t size)
 {
   std::string str(size, '\0');
   read_buf(&str[0], sizeof(char), size);
   return str;
 }
 
-void ReaderNative::read_double_chunk(size_t count)
+void ReaderSLNative::read_double_chunk(size_t count)
 {
   // extend buffer to fit chunk size
   if (count > maxbuf) {
@@ -549,14 +549,14 @@ void ReaderNative::read_double_chunk(size_t count)
   read_buf(databuf, sizeof(double), count);
 }
 
-void ReaderNative::skip_buf(size_t size)
+void ReaderSLNative::skip_buf(size_t size)
 {
   bigint pos = platform::ftell(fp);
   pos += size;
   platform::fseek(fp,pos);
 }
 
-bool ReaderNative::is_known_magic_str() const
+bool ReaderSLNative::is_known_magic_str() const
 {
   return magic_string == "DUMPATOM" || magic_string == "DUMPCUSTOM";
 }

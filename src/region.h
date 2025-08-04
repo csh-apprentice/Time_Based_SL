@@ -83,6 +83,13 @@ class Region : protected Pointers {
   double SL_debug;  // a debug variable that you can use for variables output
   double SL_steps;  // accumulated steps in SL simulation
 
+  // SL Theory
+  double th_radius;
+  double th_vradius;
+  double th_aradius;
+  double th_Tb0;
+  double th_delta;
+
   int lost_partilces;  // number of lost particles in the simulation
 
   int stepnum;  // average the dTbl/dt over # stepunm

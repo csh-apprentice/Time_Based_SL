@@ -169,7 +169,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--N", type=int, default=int(1e5))
     parser.add_argument("--min_dist", type=float, default=2.0)
-    parser.add_argument("--Rb", type=float, default=30870.0)
+    parser.add_argument("--Rb", type=float, default=3.086969205287614e+04)
     parser.add_argument("--xa", type=float, default=-1.5781)
     parser.add_argument("--xb", type=float, default=3.9468)
     parser.add_argument("--max_attempts", type=int, default=int(1e11))

@@ -79,6 +79,11 @@ class Group : protected Pointers {
   double SL_numatoms(int, Region *);  // number of atoms in the gas shell
   double SL_debug(int, Region *); // print out debug variable
   double SL_steps(int, Region *); // accumulate steps in SL simulation
+  double TH_radius(int, Region *);  // Radius in Theory Calcultion
+  double TH_vradius(int, Region *);  // Velocity in Theory Calcultion
+  double TH_aradius(int, Region *);  // Accerleration in Theory Calcultion
+  double TH_Tb0(int, Region *); //Temperature of Gas shell in theory
+  double TH_delta(int, Region *); //thickness of Gas shell in theory
 
   int SL_lost(int, Region *); // print out lost particles
  private:

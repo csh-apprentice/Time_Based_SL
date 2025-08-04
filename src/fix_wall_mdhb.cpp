@@ -86,7 +86,7 @@ FixWallMDHeatbath::FixWallMDHeatbath(LAMMPS *lmp, int narg, char **arg) :
   if (style != COLLOID) dynamic_group_allow = 1;
 
   if (style == MORSE) {
-    if (narg != 15) error->all(FLERR, "Illegal fix wall/region command");
+    if (narg != 16) error->all(FLERR, "Illegal fix wall/region command");
 
     epsilon = utils::numeric(FLERR, arg[5], false, lmp);
     alpha = utils::numeric(FLERR, arg[6], false, lmp);
@@ -97,20 +97,21 @@ FixWallMDHeatbath::FixWallMDHeatbath(LAMMPS *lmp, int narg, char **arg) :
     density=utils::numeric(FLERR, arg[11], false, lmp);
     capacity=utils::numeric(FLERR, arg[12], false, lmp);
     Tinfty=utils::numeric(FLERR, arg[13], false, lmp)*scalefactor;
+    Tblgasinit=utils::numeric(FLERR, arg[14], false, lmp)*scalefactor;
     // Tbl variable checking
-    if (utils::strmatch(arg[14], "^v_")) {
-    Tblstr = utils::strdup(arg[14] + 2);
+    if (utils::strmatch(arg[15], "^v_")) {
+    Tblstr = utils::strdup(arg[15] + 2);
     Tblstyle=VARIABLE;
     varshape=1;
     }
     else 
     {
-      Tbl=utils::numeric(FLERR, arg[14], false, lmp)*scalefactor;
+      Tbl=utils::numeric(FLERR, arg[15], false, lmp)*scalefactor;
       Tblstyle=CONSTANT;
     }    
 
   } else {
-    if (narg != 14) error->all(FLERR, "Illegal fix wall/region command");
+    if (narg != 15) error->all(FLERR, "Illegal fix wall/region command");
     epsilon = utils::numeric(FLERR, arg[5], false, lmp);
     sigma = utils::numeric(FLERR, arg[6], false, lmp);
     cutoff = utils::numeric(FLERR, arg[7], false, lmp);
@@ -119,14 +120,15 @@ FixWallMDHeatbath::FixWallMDHeatbath(LAMMPS *lmp, int narg, char **arg) :
     density=utils::numeric(FLERR, arg[10], false, lmp);
     capacity=utils::numeric(FLERR, arg[11], false, lmp);
     Tinfty=utils::numeric(FLERR, arg[12], false, lmp)*scalefactor;
-    if (utils::strmatch(arg[13], "^v_")) {
-    Tblstr = utils::strdup(arg[13] + 2);
+    Tblgasinit=utils::numeric(FLERR, arg[13], false, lmp)*scalefactor;
+    if (utils::strmatch(arg[14], "^v_")) {
+    Tblstr = utils::strdup(arg[14] + 2);
     Tblstyle=VARIABLE;
     varshape=1;
     }
     else 
     {
-      Tbl=utils::numeric(FLERR, arg[13], false, lmp)*scalefactor;
+      Tbl=utils::numeric(FLERR, arg[14], false, lmp)*scalefactor;
       Tblstyle=CONSTANT;
     }
 
@@ -246,8 +248,8 @@ void FixWallMDHeatbath::init()
     if (respa_level >= 0) ilevel_respa = MIN(respa_level, ilevel_respa);
   }
   liquidenergy=cal_liquid_energy(region->SL_radius,region->SL_delta);
-  region->SL_Tblgas=Tbl;
-  region->SL_Tblgasold=Tbl;
+  region->SL_Tblgas=Tblgasinit;
+  region->SL_Tblgasold=Tblgasinit;
   region->SL_Tblliquid=Tbl;
   region->SL_Tblliquidold=Tbl;
   //olddelta=delta;
@@ -413,7 +415,7 @@ void FixWallMDHeatbath::post_force(int vflag)
         vscale=sqrt((1-mix_coeff+mix_coeff*new_kienergy/old_kienergy));
         energy_loss+=(mix_coeff*(old_kienergy-new_kienergy))*1e7/NA;  // use the standard unit
         //sum_kienergy+=mix_coeff*new_kienergy+(1-mix_coeff)*old_kienergy;
-        //utils::logmesg(lmp,"Current time is {}, energy loss is {} \n", update->ntimestep, energy_loss);
+        //utils::logmesg(lmp,"Current time is {}, tlast is {} \n", update->ntimestep, tlast[i]);
         av[i][0]*=vscale;
         av[i][1]*=vscale;
         av[i][2]*=vscale;
@@ -475,7 +477,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   MPI_Allreduce(pair_virial, pair_stress, 6, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(kspace_virial, kspace_stress, 6, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(ke_virial,ke_stress,6,MPI_DOUBLE,MPI_SUM,world);
-  //utils::logmesg(lmp,"In step {}, sumenergyloss is {}\n",update->ntimestep,sumenergyloss);
+  //utils::logmesg(lmp,"In step {}, sumenergyloss is {}, Tblgas before update is {}\n",update->ntimestep,sumenergyloss,region->SL_Tblgas);
   fix_stress_sum=(fix_stress[0]+fix_stress[1]+fix_stress[2])*nktv2p;
   pair_stress_sum=(pair_stress[0]+pair_stress[1]+pair_stress[2])*nktv2p;
   kspace_stress_sum=(kspace_stress[0]+kspace_stress[1]+kspace_stress[2])*nktv2p;
@@ -488,6 +490,7 @@ void FixWallMDHeatbath::post_force(int vflag)
   region->numatoms=sumnumatoms;
   region->SL_Tblgasold=region->SL_Tblgas;
   region->SL_Tblgas=gasshellenergy*1e7/(3.0/2.0*KB*NA*sumnumatoms);
+  //utils::logmesg(lmp,"In step {}, sumenergyloss is {}, Tblgas after update is {}\n",update->ntimestep,sumenergyloss,region->SL_Tblgas);
     //utils::logmesg(lmp,"liquid energy is {}, sumenergyloss is {}\n",liquidenergy,sumenergyloss);
   Tbl_update(region->SL_radius,region->SL_lastradius,region->SL_delta,region->SL_deltaold);
   region->SL_Tblliquidold=Tblold;
