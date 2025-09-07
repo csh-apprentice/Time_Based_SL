@@ -22,7 +22,7 @@ variable sigma equal 3.401
 variable sigma_water equal 3.463
 
 # --- Ensemble Particle Parameters ---
-variable N_ensem equal 1e4
+variable N_ensem equal 1e5
 variable initialR equal 4.5e-6
 variable Tinfty equal 300
 variable Pinfty equal 101325
@@ -80,7 +80,7 @@ region bubble_sphere sphere 0.0 0.0 0.0 ${MAX_RADIUS} side in
 
 #read_dump /home/shihan/projects/sonoluminescence/lammps/build/lammps_sequence_input/intialize/initialize_1000000.lammpstrj 0 x y z vx vy vz fx fy fz q 
 #create_box 1 boundary
-read_data /home/shihan/projects/sonoluminescence/lammps/build/lammps_sequence_input/intialize/initialize_10000.lammpsdata
+read_data /home/shihan/projects/sonoluminescence/lammps/build/lammps_sequence_input/intialize/initialize_100000.lammpsdata
 
 #create_atoms 1 ununiform ${N_ensem} 88 bubble_sphere ${a} ${c} ${MAX_RADIUS_IN} 512 overlap ${d_ensem} maxtry 50
 
@@ -124,7 +124,7 @@ variable Nstep equal 1e4
 variable Steps2run equal 1e7/${timestep}
 
 # --- restart strategy
-dump myDump all custom ${Nstep} ./dumpfiles/debug_*.lammpstrj id type x y z vx vy vz fx fy fz q i_tlast i2_label d_mindist
+#dump myDump all custom ${Nstep} ./dumpfiles/debug_*.lammpstrj id type x y z vx vy vz fx fy fz q i_tlast i2_label d_mindist
 # read_dump ./dumpfiles/debug_0.lammpstrj 0 x y z vx vy vz fx fy fz q 
 #read_sldump ./dumpfiles/debug_0.lammpstrj 0 x y z vx vy vz fx fy fz q i_tlast i2_label d_mindist
 #write_data data.*
@@ -132,6 +132,10 @@ dump myDump all custom ${Nstep} ./dumpfiles/debug_*.lammpstrj id type x y z vx v
 
 # --- minimize
 minimize 1.0e-4 1.0e-4 1000 1000
+
+# --- Time Control and Exit ---
+reset_timestep 0
+fix rebalance all balance 100000 1.0 shift xyz 10 1.1
 
 # --- Time Evolution ---
 timestep ${timestep}
@@ -177,19 +181,26 @@ variable THdelta equal thdelta(all,km_sphere)
 compute coretemp all temp/region core
 variable corecount equal count(all,core)
 compute pcore all reduce/region core sum c_peratom[1] c_peratom[2] c_peratom[3]
-variable presscore equal -(c_pcore[1]+c_pcore[2]+c_pcore[3])/(4.0*${pi}*${RCORE}^3)
+compute pbubble all reduce/region km_sphere sum c_peratom[1] c_peratom[2] c_peratom[3]
+variable presscore equal -(c_pcore[1]+c_pcore[2]+c_pcore[3])/(4.0*${pi}*v_RCORE^3)
+variable pressbubble equal -(c_pbubble[1]+c_pbubble[2]+c_pbubble[3])/(4.0*${pi}*v_SLradius^3)
 
-thermo 1
-thermo_style custom step dt time cpu vcpu tpcpu spcpu temp etotal press c_coretemp v_corecount v_SLradius v_SLdebug v_SLvradius v_SLcount v_SLpressure v_SLpb v_SLTblgas v_SLTwall v_SLdelta v_SLnumatoms v_presscore v_SLvdelta v_SLsteps v_THradius v_THvradius v_THaradius v_THTb0 v_THdelta
+# -- Per-Atom Properties for per-atom 
+variable slvelocity atom sqrt(vx^2+vy^2+vz^2)
+variable slcharge atom q
+variable slvirial atom c_peratom[1]+c_peratom[2]+c_peratom[3]
+
+# attribute distribution
+compute comdis all chunk/atom bin/sphere 0.0 0.0 0.0 0.0 ${MAX_RADIUS} 100 discard yes
+fix fixcomdis all ave/chunk 100 10 1000 comdis temp v_slcharge v_slvelocity v_slvirial density/mass density/number file comdis_test_1e5_read.out
+
+thermo 1000
+thermo_style custom step dt time cpu vcpu tpcpu spcpu cpuuse temp etotal press v_pressbubble c_coretemp v_corecount v_SLradius v_SLdebug v_SLvradius v_SLcount v_SLpressure v_SLpb v_SLTblgas v_SLTwall v_SLdelta v_SLnumatoms v_presscore v_SLvdelta v_SLsteps v_THradius v_THvradius v_THaradius v_THTb0 v_THdelta
 thermo_modify format v_SLdelta %14.15g
 
 # --- Wall and Region Forces ---
 fix wall all wall/mdhb km_sphere lj126 ${epsilon_water_ensem} ${sigma_water_ensem} ${cutoff} 1.0 ${scalefactor} 1000.0 4180.0 300.0 ${Tbl} ${Tbl}
 fix_modify wall virial yes
-
-# --- Time Control and Exit ---
-reset_timestep 0
-fix rebalance all balance 100000 1.0 shift xyz 10 1.1
 
 variable tmin equal 1.0
 variable tmax equal 16.0
@@ -200,5 +211,4 @@ variable estimate_Xmax equal ${estimate_max_velocity}*${tmin}
 fix adaptive_step all dt/reset 1000 ${tmin} ${tmax} ${estimate_Xmax}
 fix whenhalt all halt 1000 v_SLsteps > 1e7
 
-run 1000
-#run 2000
+run ${Steps2run}
